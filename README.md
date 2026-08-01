@@ -1,4 +1,4 @@
-# AutoMateAI – Autonomous AI Executive Assistant
+# ProspectIQ – Autonomous AI Executive Assistant
 
 ## 🚀 Overview
 
