@@ -13,6 +13,8 @@ from app.api.executor import router as executor_router
 from app.api.auth import router as auth_router
 from app.api.knowledge import router as knowledge_router
 from app.api.persona import router as persona_router
+from app.api.intent import router as intent_router
+
 
 
 app = FastAPI(
@@ -33,6 +35,7 @@ app.include_router(executor_router)
 app.include_router(auth_router)
 app.include_router(knowledge_router)
 app.include_router(persona_router)
+app.include_router(intent_router)
 
 @app.get("/")
 async def root():
