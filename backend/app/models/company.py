@@ -38,4 +38,6 @@ class Company(Base):
     analyses = relationship(
         "AnalysisResult",
         back_populates="company",
+        cascade="all, delete-orphan",
+
     )
