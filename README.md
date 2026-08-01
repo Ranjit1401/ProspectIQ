@@ -2,7 +2,7 @@
 
 ## 🚀 Overview
 
-AutoMateAI is an autonomous multi-agent AI assistant designed to execute complex real-world tasks from a single user request.
+ProspectIQ is an autonomous multi-agent AI assistant designed to execute complex real-world tasks from a single user request.
 
 Instead of acting like a normal chatbot, AutoMateAI breaks a task into multiple subtasks, delegates them to specialized AI agents, coordinates execution, and provides the final result to the user.
 

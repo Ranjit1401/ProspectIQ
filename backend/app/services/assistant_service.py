@@ -12,6 +12,7 @@ from app.models.user import User
 
 from app.services.analysis_service import AnalysisService
 from app.services.knowledge_service import KnowledgeService
+from app.services.company_service import CompanyService
 
 
 class AssistantService:
@@ -31,6 +32,8 @@ class AssistantService:
         self.strategy = StrategyAgent()
 
         self.guardrail = GuardrailAgent()
+
+        self.company_service = CompanyService()
 
     async def analyze(
         self,
@@ -76,6 +79,13 @@ class AssistantService:
         )
 
         knowledge = record.processed_data["knowledge"]
+
+        company = self.company_service.get_or_create(
+            db=db,
+            name=knowledge.get("company", ""),
+            website=knowledge.get("website", ""),
+            industry=knowledge.get("industry", ""),
+        )
 
         timeline.append(
             {
@@ -220,6 +230,7 @@ class AssistantService:
         analysis = self.analysis_service.save(
             db=db,
             user_id=current_user.id,
+            company_id=company.id,
             knowledge_id=record.id,
             persona=persona,
             intent=intent,

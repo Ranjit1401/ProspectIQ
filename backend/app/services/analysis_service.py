@@ -9,6 +9,7 @@ class AnalysisService:
         self,
         db,
         user_id,
+        company_id,
         knowledge_id,
         persona,
         intent,
@@ -21,6 +22,7 @@ class AnalysisService:
 
         result = AnalysisResult(
             user_id=user_id,
+            company_id=company_id,
             knowledge_id=knowledge_id,
             persona=persona,
             intent=intent,

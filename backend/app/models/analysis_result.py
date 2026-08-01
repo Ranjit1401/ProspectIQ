@@ -2,7 +2,7 @@ from datetime import datetime
 
 from sqlalchemy import DateTime, ForeignKey, Integer
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import Base
 
@@ -23,6 +23,12 @@ class AnalysisResult(Base):
 
     knowledge_id: Mapped[int] = mapped_column(
         ForeignKey("knowledge_sources.id"),
+        nullable=False,
+    )
+
+    # NEW
+    company_id: Mapped[int] = mapped_column(
+        ForeignKey("companies.id"),
         nullable=False,
     )
 
@@ -66,4 +72,10 @@ class AnalysisResult(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
         default=datetime.utcnow,
+    )
+
+    # NEW
+    company = relationship(
+        "Company",
+        back_populates="analyses",
     )
