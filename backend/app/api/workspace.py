@@ -9,6 +9,7 @@ from app.models.analysis_result import AnalysisResult
 from app.models.company import Company
 from app.models.user import User
 from statistics import mean
+from app.models.knowledge_source import KnowledgeSource
 
 
 router = APIRouter(
@@ -503,4 +504,228 @@ async def recommendations(
 
     return {
         "recommended_companies": recommendations
+    }
+
+
+@router.get("/company/{company_id}/trend")
+async def company_trend(
+    company_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+
+    analyses = (
+        db.query(AnalysisResult)
+        .filter(
+            AnalysisResult.company_id == company_id,
+            AnalysisResult.user_id == current_user.id,
+        )
+        .order_by(
+            AnalysisResult.created_at.asc()
+        )
+        .all()
+    )
+
+    if not analyses:
+        return {
+            "error": "No analyses found"
+        }
+
+    history = []
+
+    priorities = []
+
+    stages = []
+
+    for analysis in analyses:
+
+        history.append(
+            {
+                "analysis_id": analysis.id,
+                "date": analysis.created_at,
+                "intent_score": analysis.intent.get(
+                    "intent_score",
+                    0,
+                ),
+            }
+        )
+
+        priorities.append(
+            analysis.intent.get(
+                "priority",
+                "",
+            )
+        )
+
+        stages.append(
+            analysis.intent.get(
+                "buying_stage",
+                "",
+            )
+        )
+
+    scores = [
+        x["intent_score"]
+        for x in history
+    ]
+
+    current = scores[-1]
+
+    previous = scores[-2] if len(scores) > 1 else current
+
+    change = current - previous
+
+    if change > 5:
+        trend = "Increasing"
+
+    elif change < -5:
+        trend = "Decreasing"
+
+    else:
+        trend = "Stable"
+
+    if current >= 80:
+
+        recommendation = "Contact immediately"
+
+    elif current >= 60:
+
+        recommendation = "Continue nurturing"
+
+    else:
+
+        recommendation = "Monitor account"
+
+    return {
+
+        "company_id": company_id,
+
+        "trend": trend,
+
+        "current_intent": current,
+
+        "previous_intent": previous,
+
+        "change": change,
+
+        "recommendation": recommendation,
+
+        "history": history,
+
+        "priority_history": priorities,
+
+        "buying_stage_history": stages,
+
+    }
+
+@router.get("/company/{company_id}/activity")
+async def company_activity(
+    company_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+
+    analyses = (
+        db.query(AnalysisResult)
+        .filter(
+            AnalysisResult.company_id == company_id,
+            AnalysisResult.user_id == current_user.id,
+        )
+        .order_by(
+            AnalysisResult.created_at.asc()
+        )
+        .all()
+    )
+
+    if not analyses:
+        return {
+            "error": "No activity found"
+        }
+
+    timeline = []
+
+    for analysis in analyses:
+
+        created = analysis.created_at
+
+        knowledge = (
+            db.query(KnowledgeSource)
+            .filter(
+                KnowledgeSource.id == analysis.knowledge_id
+            )
+            .first()
+        )
+
+        if knowledge:
+
+            company = knowledge.processed_data.get(
+                "knowledge",
+                {}
+            ).get(
+                "company",
+                ""
+            )
+
+            timeline.append({
+                "time": created,
+                "type": "Knowledge",
+                "icon": "📄",
+                "title": "Knowledge Extracted",
+                "description": f"Company identified as {company}"
+            })
+
+        decision = analysis.persona.get(
+            "primary_decision_maker",
+            ""
+        )
+
+        if decision:
+
+            timeline.append({
+                "time": created,
+                "type": "Persona",
+                "icon": "👤",
+                "title": "Decision Maker Identified",
+                "description": decision
+            })
+
+        timeline.append({
+            "time": created,
+            "type": "Intent",
+            "icon": "📈",
+            "title": "Buying Intent",
+            "description": f'Intent Score: {analysis.intent.get("intent_score",0)}'
+        })
+
+        timeline.append({
+            "time": created,
+            "type": "Strategy",
+            "icon": "🎯",
+            "title": "Next Best Action",
+            "description": analysis.strategy.get(
+                "next_best_action",
+                ""
+            )
+        })
+
+        timeline.append({
+            "time": created,
+            "type": "Guardrail",
+            "icon": "🛡️",
+            "title": "Risk Assessment",
+            "description": analysis.guardrail.get(
+                "risk_level",
+                ""
+            )
+        })
+
+    timeline.sort(
+        key=lambda x: x["time"]
+    )
+
+    return {
+        "company_id": company_id,
+        "company": analyses[0].company.name,
+        "total_events": len(timeline),
+        "timeline": timeline,
     }

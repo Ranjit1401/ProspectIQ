@@ -4,44 +4,62 @@ import re
 
 class DecisionEngine:
     """
-    Uses the LLM to decide which tool should be used.
+    Uses the LLM to decide which tool should be used and
+    generates a research plan.
     """
 
     def __init__(self, llm):
         self.llm = llm
 
-    async def choose_tool(self, task: str) -> str | None:
+    async def choose_tool(self, task: str):
 
         prompt = f"""
-You are ProspectIQ's Tool Selector.
+You are ProspectIQ's Research Planner.
 
 Available tools:
 
 1. calculator
-   - Use for arithmetic and mathematical calculations.
-
 2. weather
-   - Use for weather, climate, forecast or temperature questions.
-
 3. search
-   - Use for:
-     - Who is ...
-     - What is ...
-     - Latest news
-     - Search requests
-     - Find information
-     - Current events
-     - General factual questions requiring web search.
+4. news
+   - Latest company news
+   - Funding
+   - Partnerships
+   - Acquisitions
+   - Product launches
+For company research, DO NOT perform only one search.
 
-If no tool is required return:
+Generate multiple focused search queries.
+
+Example:
+
+{{
+    "tool":"search",
+    "queries":[
+        "Microsoft company overview",
+        "Microsoft leadership",
+        "Microsoft products",
+        "Microsoft AI initiatives",
+        "Microsoft recent news",
+        "Microsoft hiring",
+        "Microsoft competitors",
+        "Microsoft financials"
+    ]
+}}
+
+For calculator:
+
+{{"tool":"calculator"}}
+
+For weather:
+
+{{"tool":"weather"}}
+
+If no tool is required:
 
 {{"tool":"none"}}
 
 Return ONLY valid JSON.
-
-Example:
-
-{{"tool":"calculator"}}
 
 User Request:
 
@@ -52,7 +70,6 @@ User Request:
 
         content = response.content.strip()
 
-        # Handle ```json ... ``` responses
         if content.startswith("```"):
             content = (
                 content.replace("```json", "")
@@ -64,21 +81,19 @@ User Request:
 
             data = json.loads(content)
 
-            tool = data.get("tool", "none").lower()
-
-            if tool == "none":
+            if data.get("tool") == "none":
                 return None
 
-            return tool
+            return data
 
         except Exception:
-
-            # Fallback rule-based detection
 
             task_lower = task.lower()
 
             if any(op in task for op in ["+", "-", "*", "/", "%"]):
-                return "calculator"
+                return {
+                    "tool": "calculator"
+                }
 
             if any(word in task_lower for word in [
                 "weather",
@@ -86,25 +101,22 @@ User Request:
                 "temperature",
                 "climate",
             ]):
-                return "weather"
+                return {
+                    "tool": "weather"
+                }
 
-            if any(word in task_lower for word in [
-                "who is",
-                "what is",
-                "latest",
-                "news",
-                "search",
-                "find",
-                "tell me about",
-            ]):
-                return "search"
-
-            return None
+            return {
+                "tool": "search",
+                "queries": [
+                    task,
+                ],
+            }
 
     async def extract_arguments(
         self,
         tool: str,
         task: str,
+        query: str | None = None,
     ):
 
         if tool == "calculator":
@@ -140,15 +152,19 @@ User Request:
 
         elif tool == "search":
 
-            query = (
-                task.lower()
-                .replace("search", "")
-                .replace("find", "")
-                .strip()
-            )
+            if query:
+
+                return {
+                    "query": query,
+                }
 
             return {
-                "query": query,
+                "query": task,
+            }
+
+        elif tool == "news":
+            return {
+                "company": task,
             }
 
         return {}

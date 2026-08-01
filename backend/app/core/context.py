@@ -10,6 +10,8 @@ from app.tools.registry import ToolRegistry
 from app.memory.memory import Memory
 from app.tools.weather import WeatherTool
 from app.tools.search import SearchTool
+from app.tools.news import NewsTool
+from app.tools.website_tool import WebsiteTool
 
 class AppContext:
     """
@@ -74,6 +76,14 @@ class AppContext:
                 self.llm,
                 self.tool_registry,
             )
+        )
+
+        self.tool_registry.register(
+            NewsTool()
+        )
+
+        self.tool_registry.register(
+            WebsiteTool()
         )
 
         # ---------- Memory ----------
