@@ -17,34 +17,34 @@ export function AuroraBackground({ className = "" }: { className?: string }) {
       className={`pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-[#090909] ${className}`}
     >
       <motion.div
-        className="absolute -top-[20%] left-[10%] h-[60vh] w-[60vh] rounded-full opacity-[0.07] blur-[110px]"
+        className="absolute -top-[20%] left-[10%] h-[60vh] w-[60vh] rounded-full opacity-[0.18] blur-[95px]"
         style={{
           background:
-            "radial-gradient(circle, rgba(255,255,255,0.9) 0%, rgba(200,200,200,0.4) 45%, transparent 70%)",
+            "radial-gradient(circle, rgba(255,255,255,0.95) 0%, rgba(200,200,200,0.5) 45%, transparent 70%)",
         }}
         animate={{ x: [0, 40, -20, 0], y: [0, 20, -10, 0] }}
         transition={{ duration: 28, repeat: Infinity, ease: "easeInOut" }}
       />
       <motion.div
-        className="absolute top-[30%] right-[5%] h-[50vh] w-[50vh] rounded-full opacity-[0.05] blur-[120px]"
+        className="absolute top-[30%] right-[5%] h-[50vh] w-[50vh] rounded-full opacity-[0.14] blur-[105px]"
         style={{
           background:
-            "radial-gradient(circle, rgba(229,228,226,0.8) 0%, rgba(150,150,150,0.3) 50%, transparent 70%)",
+            "radial-gradient(circle, rgba(229,228,226,0.9) 0%, rgba(150,150,150,0.4) 50%, transparent 70%)",
         }}
         animate={{ x: [0, -30, 15, 0], y: [0, -25, 10, 0] }}
         transition={{ duration: 34, repeat: Infinity, ease: "easeInOut" }}
       />
       <motion.div
-        className="absolute bottom-[-10%] left-[35%] h-[55vh] w-[55vh] rounded-full opacity-[0.05] blur-[130px]"
+        className="absolute bottom-[-10%] left-[35%] h-[55vh] w-[55vh] rounded-full opacity-[0.14] blur-[115px]"
         style={{
           background:
-            "radial-gradient(circle, rgba(255,255,255,0.7) 0%, rgba(180,180,180,0.25) 50%, transparent 70%)",
+            "radial-gradient(circle, rgba(255,255,255,0.85) 0%, rgba(180,180,180,0.35) 50%, transparent 70%)",
         }}
         animate={{ x: [0, 25, -25, 0], y: [0, -15, 15, 0] }}
         transition={{ duration: 40, repeat: Infinity, ease: "easeInOut" }}
       />
       <div className="absolute inset-0 noise-overlay" />
-      <div className="absolute inset-0 bg-gradient-to-b from-[#090909]/40 via-transparent to-[#090909]/60" />
+      <div className="absolute inset-0 bg-gradient-to-b from-[#090909]/20 via-transparent to-[#090909]/45" />
     </div>
   );
 }

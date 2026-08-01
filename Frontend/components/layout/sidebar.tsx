@@ -17,6 +17,7 @@ import {
 import { NAV_ITEMS, APP_NAME } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { LogoMark } from "@/components/common/logo";
 
 const ICONS: Record<string, React.ElementType> = {
   workspace: Sparkles,
@@ -32,9 +33,7 @@ export function Sidebar({ onOpenPalette }: { onOpenPalette: () => void }) {
   return (
     <aside className="hidden lg:flex h-screen w-[248px] shrink-0 flex-col border-r border-white/6 bg-[#0b0b0b]/80 backdrop-blur-xl">
       <div className="flex items-center gap-2 px-5 py-6">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-b from-white to-white/70 text-[#090909]">
-          <LayoutGrid className="h-4 w-4" />
-        </div>
+        <LogoMark size={32} />
         <span className="text-sm font-semibold tracking-tight text-white">{APP_NAME}</span>
       </div>
 
