@@ -1,3 +1,4 @@
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.auth.jwt import create_access_token
@@ -14,14 +15,23 @@ class AuthService:
         user: UserCreate,
     ):
 
-        existing = (
+        existing_email = (
             db.query(User)
             .filter(User.email == user.email)
             .first()
         )
 
-        if existing:
+        if existing_email:
             raise ValueError("Email already exists")
+
+        existing_username = (
+            db.query(User)
+            .filter(User.username == user.username)
+            .first()
+        )
+
+        if existing_username:
+            raise ValueError("Username already exists")
 
         new_user = User(
             username=user.username,
@@ -30,7 +40,13 @@ class AuthService:
         )
 
         db.add(new_user)
-        db.commit()
+
+        try:
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+            raise ValueError("Username or email already exists")
+
         db.refresh(new_user)
 
         return new_user
