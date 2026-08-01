@@ -12,7 +12,7 @@ const WELCOME: ChatMessage = {
   id: "welcome",
   role: "assistant",
   content:
-    "Send me a company brief, some notes, or a website summary and I'll run it through the research pipeline — knowledge extraction, persona, intent, strategy, and a guardrail check.",
+    "Send me a company brief, some notes, or a website summary and I'll run it through the research pipeline — knowledge extraction, persona, intent, strategy, and a guardrail check. Ask me a general question instead and I'll just answer it directly.",
   timestamp: new Date().toISOString(),
 };
 
@@ -32,15 +32,34 @@ export function WorkspaceClient() {
     setSending(true);
 
     try {
-      const response = await workspaceService.analyze(text);
-      setResult(response);
+      // The Supervisor plans the task and routes it to whichever agent
+      // fits: the sales-analysis pipeline for company briefs/notes, or
+      // the research agent for general questions. The frontend no
+      // longer decides which endpoint to call — the backend does.
+      const response = await workspaceService.runSupervisor(text);
+
+      let replyContent: string;
+
+      if (response.agent === "sales_analysis") {
+        const analysis = response.result.response as AnalyzeResponse;
+        setResult(analysis);
+        replyContent =
+          analysis.overall_assessment?.overall_recommendation ||
+          "Analysis complete — see the executive brief and agent progress panels for the full breakdown.";
+      } else {
+        // Research agent — don't touch the executive brief/timeline
+        // panels, this wasn't a company analysis.
+        const researchResponse = response.result.response as { content?: string };
+        replyContent =
+          researchResponse?.content ||
+          (typeof response.result.response === "string" ? response.result.response : null) ||
+          "Here's what I found.";
+      }
 
       const reply: ChatMessage = {
         id: `m-${Date.now() + 1}`,
         role: "assistant",
-        content:
-          response.overall_assessment?.overall_recommendation ||
-          "Analysis complete — see the executive brief and agent progress panels for the full breakdown.",
+        content: replyContent,
         timestamp: new Date().toISOString(),
       };
       setMessages((prev) => [...prev, reply]);

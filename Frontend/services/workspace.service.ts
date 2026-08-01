@@ -57,11 +57,90 @@ export interface WorkspaceCompanySummary {
   priority: string;
 }
 
+export interface CompanyDashboardCompany {
+  id: number;
+  name: string;
+  website: string;
+  industry: string;
+}
+
+export interface CompanyDashboard {
+  company: CompanyDashboardCompany;
+  summary: string;
+  health_score: number;
+  latest_intent_score: number;
+  priority: string;
+  buying_stage: string;
+  risk_level: string;
+  decision_maker: string;
+  recommended_action: string;
+  communication_style: string;
+  confidence: number;
+  analyses_count: number;
+  latest_analysis: {
+    analysis_id: number;
+    created_at: string;
+  };
+}
+
+/**
+ * The backend returns 200 with an { error: "..." } body instead of a 404
+ * for missing companies, so callers need to check for that shape rather
+ * than relying on apiFetch to throw.
+ */
+export interface CompanyDashboardError {
+  error: string;
+}
+
+/** Shape returned when the Supervisor routed to the sales_analysis agent. */
+export interface SalesAnalysisAgentResult {
+  agent: "sales_analysis";
+  response: AnalyzeResponse;
+}
+
+/** Shape returned when the Supervisor routed to the research agent. */
+export interface ResearchAgentResult {
+  agent: "research";
+  tool_used: string | null;
+  response: { content?: string } | Record<string, unknown>;
+  search_results?: Record<string, unknown>;
+}
+
+export interface SupervisorMemoryEntry {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export interface SupervisorResponse {
+  task: string;
+  plan: unknown;
+  agent: "sales_analysis" | "research";
+  result: SalesAnalysisAgentResult | ResearchAgentResult;
+  memory: SupervisorMemoryEntry[];
+}
+
 export const workspaceService = {
+  /**
+   * Sends free-form text to the Supervisor, which plans the task, routes
+   * it to the right agent (the sales-analysis pipeline for company
+   * briefs/notes, or the research agent for general questions), and
+   * returns whichever result that agent produced.
+   */
+  async runSupervisor(prompt: string): Promise<SupervisorResponse> {
+    return apiFetch<SupervisorResponse>(
+      `/supervisor/execute?prompt=${encodeURIComponent(prompt)}`,
+      { method: "POST" },
+    );
+  },
+
   /**
    * Runs the full multi-agent pipeline (ingestion -> persona -> intent ->
    * strategy -> guardrail) against free-form text and returns the
    * executive summary + full agent outputs.
+   *
+   * Kept for any code that still needs to call the pipeline directly;
+   * the workspace chat now goes through runSupervisor() instead so the
+   * Supervisor/Router decide what runs.
    */
   async analyze(text: string): Promise<AnalyzeResponse> {
     return apiFetch<AnalyzeResponse>(
@@ -73,5 +152,14 @@ export const workspaceService = {
   /** Every company the current user has run an analysis against. */
   async listCompanies(): Promise<WorkspaceCompanySummary[]> {
     return apiFetch<WorkspaceCompanySummary[]>("/workspace/");
+  },
+
+  /** Full rollup for one company: latest intent/persona/strategy/guardrail. */
+  async getCompanyDashboard(
+    companyId: number | string,
+  ): Promise<CompanyDashboard | CompanyDashboardError> {
+    return apiFetch<CompanyDashboard | CompanyDashboardError>(
+      `/workspace/company/${companyId}/dashboard`,
+    );
   },
 };

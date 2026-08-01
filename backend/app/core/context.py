@@ -1,4 +1,5 @@
 from app.agents.research_agent import ResearchAgent
+from app.agents.sales_analysis_agent import SalesAnalysisAgent
 from app.llm.gemini_provider import GeminiProvider
 from app.llm.groq_provider import GroqProvider
 from app.llm.manager import LLMManager
@@ -78,12 +79,11 @@ class AppContext:
             )
         )
 
-        self.tool_registry.register(
-            NewsTool()
-        )
-
-        self.tool_registry.register(
-            WebsiteTool()
+        self.agent_registry.register(
+            SalesAnalysisAgent(
+                self.llm,
+                self.tool_registry,
+            )
         )
 
         # ---------- Memory ----------

@@ -11,27 +11,8 @@ from app.agents.guardrail.agent import GuardrailAgent
 
 class Supervisor:
     """
-    Main Orchestrator
-
-    Flow
-
-    User
-        ↓
-    Planner
-        ↓
-    Research Agent
-        ↓
-    Knowledge Ingestion
-        ↓
-    Persona
-        ↓
-    Intent
-        ↓
-    Strategy
-        ↓
-    Guardrail
-        ↓
-    Final Response
+    Orchestrates the execution of a user task: plans it, routes it to
+    the correct agent, runs it, and records it in that user's memory.
     """
 
     def __init__(self):
@@ -39,116 +20,28 @@ class Supervisor:
         self.router = Router()
         self.planner = Planner()
 
-        self.knowledge = KnowledgeIngestionAgent()
-        self.persona = PersonaAgent()
-        self.intent = IntentAgent()
-        self.strategy = StrategyAgent()
-        self.guardrail = GuardrailAgent()
+    async def execute(self, task: str, current_user, db):
 
-    async def execute(
-        self,
-        task: str,
-    ):
+        context.memory.add(current_user.id, "user", task)
 
-        # ----------------------------------
-        # Store User Message
-        # ----------------------------------
+        plan = await self.planner.create_plan(task)
 
-        context.memory.add(
-            "user",
+        agent = await self.router.route(task)
+
+        result = await agent.run(
             task,
+            current_user=current_user,
+            db=db,
         )
 
-        # ----------------------------------
-        # Create Plan
-        # ----------------------------------
+        response = result.get("response")
 
-        plan = await self.planner.create_plan(
-            task
-        )
+        if hasattr(response, "content"):
+            memory_text = response.content
+        else:
+            memory_text = str(response)
 
-        # ----------------------------------
-        # Research Agent
-        # ----------------------------------
-
-        research_agent = await self.router.route(
-            task
-        )
-
-        research = await research_agent.run(
-            task
-        )
-
-        evidence = research.get(
-            "evidence",
-            "",
-        )
-
-        # ----------------------------------
-        # Knowledge Ingestion
-        # ----------------------------------
-
-        knowledge = await self.knowledge.ingest(
-            text=evidence,
-        )
-
-        knowledge_data = knowledge.get(
-            "knowledge",
-            {},
-        )
-
-        # ----------------------------------
-        # Persona
-        # ----------------------------------
-
-        persona = await self.persona.analyze(
-            knowledge_data
-        )
-
-        # ----------------------------------
-        # Intent
-        # ----------------------------------
-
-        intent = await self.intent.analyze(
-            knowledge_data
-        )
-
-        # ----------------------------------
-        # Strategy
-        # ----------------------------------
-
-        strategy = await self.strategy.generate(
-            knowledge_data,
-            persona,
-            intent,
-        )
-
-        # ----------------------------------
-        # Guardrail
-        # ----------------------------------
-
-        guardrail = await self.guardrail.verify(
-            knowledge_data,
-            persona,
-            intent,
-            strategy,
-        )
-
-        # ----------------------------------
-        # Save Memory
-        # ----------------------------------
-
-        context.memory.add(
-            "assistant",
-            strategy.get(
-                "account_summary",
-                "",
-            ),
-        )
-
-        # ----------------------------------
-        # Final Result
-        # ----------------------------------
+        context.memory.add(current_user.id, "assistant", memory_text)
 
         return {
 
@@ -156,17 +49,17 @@ class Supervisor:
 
             "plan": plan,
 
-            "research": research,
+            # "research": research,
 
-            "knowledge": knowledge,
+            # "knowledge": knowledge,
 
-            "persona": persona,
+            # "persona": persona,
 
-            "intent": intent,
+            # "intent": intent,
 
-            "strategy": strategy,
+            # "strategy": strategy,
 
-            "guardrail": guardrail,
+            # "guardrail": guardrail,
 
             "memory": context.memory.get_history(),
 

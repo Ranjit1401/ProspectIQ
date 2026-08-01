@@ -145,7 +145,7 @@ class AssistantService:
 
         step_start = time.perf_counter()
 
-        strategy = await self.strategy.generate(knowledge)
+        strategy = await self.strategy.generate(knowledge, persona, intent)
 
         timeline.append(
             {
@@ -165,7 +165,7 @@ class AssistantService:
 
         step_start = time.perf_counter()
 
-        guardrail = await self.guardrail.verify(knowledge)
+        guardrail = await self.guardrail.verify(knowledge, persona, intent, strategy)
 
         timeline.append(
             {

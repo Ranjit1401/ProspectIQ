@@ -1,26 +1,90 @@
-import { notFound } from "next/navigation";
+"use client";
+
+import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrustScoreCard, ConfidenceMeter, EvidenceList } from "@/components/report/trust-score-card";
 import { StakeholderCard, PainPointCard } from "@/components/report/stakeholder-card";
 import {
-  MOCK_COMPANIES,
-  getCompanyById,
-  getPainPointsByCompany,
   getStakeholdersByCompany,
+  getPainPointsByCompany,
   MOCK_BUYING_SIGNALS,
 } from "@/lib/mock-data";
+import {
+  workspaceService,
+  type CompanyDashboard,
+  type CompanyDashboardError,
+} from "@/services/workspace.service";
+import { ApiError } from "@/services/api-client";
 
-export function generateStaticParams() {
-  return MOCK_COMPANIES.map((c) => ({ id: c.id }));
+function isDashboardError(
+  data: CompanyDashboard | CompanyDashboardError,
+): data is CompanyDashboardError {
+  return "error" in data;
 }
 
-export default async function ExecutiveReportPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-  const company = getCompanyById(id);
-  if (!company) notFound();
+export default function ExecutiveReportPage() {
+  const params = useParams<{ id: string }>();
+  const id = params.id;
 
+  const [dashboard, setDashboard] = useState<CompanyDashboard | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [notFoundMsg, setNotFoundMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    setLoading(true);
+    setNotFoundMsg(null);
+
+    workspaceService
+      .getCompanyDashboard(id)
+      .then((data) => {
+        if (cancelled) return;
+        if (isDashboardError(data)) {
+          setNotFoundMsg(data.error);
+          setDashboard(null);
+        } else {
+          setDashboard(data);
+        }
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setNotFoundMsg(
+          err instanceof ApiError
+            ? err.message || "Could not load this account."
+            : "Could not reach the backend. Make sure the FastAPI server is running.",
+        );
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
+
+  if (loading) {
+    return <p className="px-2 py-6 text-sm text-white/40">Loading account…</p>;
+  }
+
+  if (notFoundMsg || !dashboard) {
+    return (
+      <div className="space-y-3 px-2 py-6">
+        <h2 className="text-lg font-semibold text-white">Account not found</h2>
+        <p className="text-sm text-white/40">
+          {notFoundMsg || "This account doesn't exist or you don't have any analyses for it yet."}
+        </p>
+      </div>
+    );
+  }
+
+  // Stakeholders/pain points aren't backed by a real endpoint yet, so these
+  // stay on mock data keyed by string ids and will render empty for real
+  // (numeric) companies until the backend exposes dedicated endpoints.
   const stakeholders = getStakeholdersByCompany(id);
   const painPoints = getPainPointsByCompany(id);
   const evidence = [
@@ -29,17 +93,20 @@ export default async function ExecutiveReportPage({ params }: { params: Promise<
     "InfraCon 2025 speaker bio and session transcript",
   ];
 
+  const company = dashboard.company;
+  const logoInitial = company.name?.[0]?.toUpperCase() ?? "?";
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <Avatar className="h-12 w-12">
-            <AvatarFallback className="text-base">{company.logoInitial}</AvatarFallback>
+            <AvatarFallback className="text-base">{logoInitial}</AvatarFallback>
           </Avatar>
           <div>
             <h2 className="text-lg font-semibold text-white">{company.name}</h2>
             <p className="text-xs text-white/40">
-              {company.industry} · {company.employees} employees · {company.revenue}
+              {company.industry || "Unknown industry"} · {company.website || "no website on file"}
             </p>
           </div>
         </div>
@@ -47,20 +114,83 @@ export default async function ExecutiveReportPage({ params }: { params: Promise<
       </div>
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-        <TrustScoreCard score={company.score} />
+        <TrustScoreCard score={Math.round(dashboard.health_score ?? 0)} />
 
         <Card>
           <CardHeader>
             <CardTitle>Confidence Breakdown</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <ConfidenceMeter label="Data grounding" value={92} />
-            <ConfidenceMeter label="Stakeholder accuracy" value={87} />
-            <ConfidenceMeter label="Personalization quality" value={81} />
-            <ConfidenceMeter label="Guardrail pass rate" value={100} />
+            <ConfidenceMeter label="Intent score" value={Math.round(dashboard.latest_intent_score ?? 0)} />
+            <ConfidenceMeter label="Guardrail confidence" value={Math.round(dashboard.confidence ?? 0)} />
           </CardContent>
         </Card>
 
+        <Card>
+          <CardHeader>
+            <CardTitle>Account Summary</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2.5">
+            <p className="text-[13px] leading-relaxed text-white/55">
+              {dashboard.summary || "No account summary available yet."}
+            </p>
+            <div className="flex flex-wrap gap-2 pt-1">
+              {dashboard.priority && <Badge variant="outline">{dashboard.priority} priority</Badge>}
+              {dashboard.buying_stage && <Badge variant="outline">{dashboard.buying_stage}</Badge>}
+              {dashboard.risk_level && (
+                <Badge variant={dashboard.risk_level.toLowerCase() === "high" ? "danger" : "outline"}>
+                  {dashboard.risk_level} risk
+                </Badge>
+              )}
+            </div>
+            {dashboard.decision_maker && (
+              <p className="text-xs text-white/40">
+                Decision maker: <span className="text-white/70">{dashboard.decision_maker}</span>
+              </p>
+            )}
+            {dashboard.recommended_action && (
+              <p className="text-xs text-white/40">
+                Next action: <span className="text-white/70">{dashboard.recommended_action}</span>
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <div className="space-y-4">
+          <h3 className="text-sm font-medium text-white/70">Stakeholders</h3>
+          <div className="space-y-3">
+            {stakeholders.length === 0 && (
+              <p className="text-xs text-white/30">
+                No stakeholder data yet — this section is still backed by mock data pending a
+                dedicated backend endpoint.
+              </p>
+            )}
+            {stakeholders.map((s) => (
+              <StakeholderCard key={s.id} stakeholder={s} />
+            ))}
+          </div>
+        </div>
+        <div className="space-y-4">
+          <h3 className="text-sm font-medium text-white/70">Pain Points</h3>
+          <div className="space-y-3">
+            {painPoints.length === 0 && (
+              <p className="text-xs text-white/30">
+                No pain point data yet — this section is still backed by mock data pending a
+                dedicated backend endpoint.
+              </p>
+            )}
+            {painPoints.map((p) => (
+              <PainPointCard key={p.id} painPoint={p} />
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <EvidenceList items={evidence} />
+
+      {MOCK_BUYING_SIGNALS.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle>Buying Signals</CardTitle>
@@ -79,28 +209,7 @@ export default async function ExecutiveReportPage({ params }: { params: Promise<
             ))}
           </CardContent>
         </Card>
-      </div>
-
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-        <div className="space-y-4">
-          <h3 className="text-sm font-medium text-white/70">Stakeholders</h3>
-          <div className="space-y-3">
-            {stakeholders.map((s) => (
-              <StakeholderCard key={s.id} stakeholder={s} />
-            ))}
-          </div>
-        </div>
-        <div className="space-y-4">
-          <h3 className="text-sm font-medium text-white/70">Pain Points</h3>
-          <div className="space-y-3">
-            {painPoints.map((p) => (
-              <PainPointCard key={p.id} painPoint={p} />
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <EvidenceList items={evidence} />
+      )}
     </div>
   );
 }
