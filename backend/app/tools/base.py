@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 
 class BaseTool(ABC):
     """
-    Base class for every RocketAI tool.
+    Base class for every ProspectIQ tool.
     """
 
     name: str

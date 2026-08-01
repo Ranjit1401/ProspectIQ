@@ -3,7 +3,7 @@ from app.agents.base import BaseAgent
 
 class AgentRegistry:
     """
-    Registry for all RocketAI agents.
+    Registry for all ProspectIQ agents.
     """
 
     def __init__(self):

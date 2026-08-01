@@ -6,7 +6,7 @@ from app.tools.registry import ToolRegistry
 
 class BaseAgent(ABC):
     """
-    Base class for all RocketAI agents.
+    Base class for all ProspectIQ agents.
     """
 
     name: str

@@ -8,6 +8,7 @@ from app.database.session import get_db
 from app.models.analysis_result import AnalysisResult
 from app.models.company import Company
 from app.models.user import User
+from statistics import mean
 
 
 router = APIRouter(
@@ -285,3 +286,221 @@ async def filter_workspace(
         )
 
     return response
+
+
+@router.get("/company/{company_id}/dashboard")
+async def company_dashboard(
+    company_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+
+    company = (
+        db.query(Company)
+        .filter(
+            Company.id == company_id
+        )
+        .first()
+    )
+
+    if company is None:
+        return {
+            "error": "Company not found"
+        }
+
+    analyses = (
+        db.query(AnalysisResult)
+        .filter(
+            AnalysisResult.company_id == company_id,
+            AnalysisResult.user_id == current_user.id,
+        )
+        .order_by(
+            AnalysisResult.created_at.desc()
+        )
+        .all()
+    )
+
+    if not analyses:
+        return {
+            "error": "No analyses found"
+        }
+
+    latest = analyses[0]
+
+    intent_scores = [
+        a.intent.get("intent_score", 0)
+        for a in analyses
+    ]
+
+    average_intent = round(
+        mean(intent_scores),
+        2,
+    )
+
+    latest_intent = latest.intent
+
+    latest_persona = latest.persona
+
+    latest_strategy = latest.strategy
+
+    latest_guardrail = latest.guardrail
+
+    dashboard = {
+
+        "company": {
+
+            "id": company.id,
+
+            "name": company.name,
+
+            "website": company.website,
+
+            "industry": company.industry,
+        },
+
+        "summary": latest_strategy.get(
+            "account_summary",
+            "",
+        ),
+
+        "health_score": average_intent,
+
+        "latest_intent_score": latest_intent.get(
+            "intent_score",
+            0,
+        ),
+
+        "priority": latest_intent.get(
+            "priority",
+            "",
+        ),
+
+        "buying_stage": latest_intent.get(
+            "buying_stage",
+            "",
+        ),
+
+        "risk_level": latest_guardrail.get(
+            "risk_level",
+            "",
+        ),
+
+        "decision_maker": latest_persona.get(
+            "primary_decision_maker",
+            "",
+        ),
+
+        "recommended_action": latest_strategy.get(
+            "next_best_action",
+            "",
+        ),
+
+        "communication_style": latest_persona.get(
+            "communication_style",
+            "",
+        ),
+
+        "confidence": latest_guardrail.get(
+            "confidence",
+            0,
+        ),
+
+        "analyses_count": len(
+            analyses
+        ),
+
+        "latest_analysis": {
+
+            "analysis_id": latest.id,
+
+            "created_at": latest.created_at,
+        }
+    }
+
+    return dashboard
+
+@router.get("/recommendations")
+async def recommendations(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+
+    analyses = (
+        db.query(AnalysisResult)
+        .filter(
+            AnalysisResult.user_id == current_user.id
+        )
+        .all()
+    )
+
+    recommendations = []
+
+    for analysis in analyses:
+
+        company = analysis.company
+
+        if company is None:
+            continue
+
+        score = 0
+
+        reasons = []
+
+        intent = analysis.intent.get(
+            "intent_score",
+            0,
+        )
+
+        score += intent
+
+        if analysis.intent.get("priority") == "High":
+            score += 10
+            reasons.append("High priority account")
+
+        if analysis.persona.get(
+            "primary_decision_maker",
+            ""
+        ):
+            score += 5
+            reasons.append("Decision maker identified")
+
+        if analysis.guardrail.get(
+            "risk_level",
+            ""
+        ).lower() == "low":
+            score += 5
+            reasons.append("Low execution risk")
+
+        if analysis.strategy.get(
+            "next_best_action",
+            ""
+        ):
+            score += 5
+            reasons.append("Clear next action available")
+
+        recommendations.append(
+            {
+                "company_id": company.id,
+                "company": company.name,
+                "score": min(score, 100),
+                "priority": analysis.intent.get(
+                    "priority",
+                    "",
+                ),
+                "intent": intent,
+                "next_action": analysis.strategy.get(
+                    "next_best_action",
+                    "",
+                ),
+                "reason": reasons,
+            }
+        )
+
+    recommendations.sort(
+        key=lambda x: x["score"],
+        reverse=True,
+    )
+
+    return {
+        "recommended_companies": recommendations
+    }

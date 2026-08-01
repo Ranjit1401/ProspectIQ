@@ -4,7 +4,7 @@ from app.supervisor.supervisor import Supervisor
 
 class ExecutionEngine:
     """
-    Executes a complete RocketAI workflow.
+    Executes a complete ProspectIQ workflow.
     """
 
     def __init__(self):

@@ -14,7 +14,7 @@ class Planner:
     ):
 
         prompt = f"""
-You are the Planner for RocketAI.
+You are the Planner for ProspectIQ.
 
 Your job is to break the user's request into execution steps.
 

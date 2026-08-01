@@ -13,7 +13,7 @@ class DecisionEngine:
     async def choose_tool(self, task: str) -> str | None:
 
         prompt = f"""
-You are RocketAI's Tool Selector.
+You are ProspectIQ's Tool Selector.
 
 Available tools:
 

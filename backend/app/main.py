@@ -29,7 +29,7 @@ from app.api.workspace import router as workspace_router
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
-    description="Open Source Agentic AI Framework",
+    description="ProspectIQ",
 )
 
 app.include_router(health_router)
@@ -57,9 +57,9 @@ app.include_router(workspace_router)
 @app.get("/")
 async def root():
     return {
-        "message": "Welcome to RocketAI 🚀",
+        "message": "Welcome to ProspectIQ 🚀",
         "version": settings.APP_VERSION,
     }
 
 
-logger.info("RocketAI initialized successfully.")
+logger.info("ProspectIQ initialized successfully.")

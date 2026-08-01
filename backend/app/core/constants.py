@@ -1,6 +1,6 @@
-"""Global constants for RocketAI."""
+"""Global constants for ProspectIQ."""
 
-FRAMEWORK_NAME = "RocketAI"
+FRAMEWORK_NAME = "ProspectIQ"
 
 DEFAULT_MODEL = "groq"
 
