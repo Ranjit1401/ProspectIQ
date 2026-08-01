@@ -225,6 +225,7 @@ class AssistantService:
             intent=intent,
             strategy=strategy,
             guardrail=guardrail,
+            overall_assessment=overall_assessment,
             timeline=timeline,
             execution=execution,
         )

@@ -7,15 +7,16 @@ class AnalysisService:
 
     def save(
         self,
-        db: Session,
-        user_id: int,
-        knowledge_id: int,
-        persona: dict,
-        intent: dict,
-        strategy: dict,
-        guardrail: dict,
-        timeline: list,
-        execution: dict,
+        db,
+        user_id,
+        knowledge_id,
+        persona,
+        intent,
+        strategy,
+        guardrail,
+        overall_assessment,
+        timeline,
+        execution,
     ):
 
         result = AnalysisResult(
@@ -25,6 +26,7 @@ class AnalysisService:
             intent=intent,
             strategy=strategy,
             guardrail=guardrail,
+            overall_assessment=overall_assessment,
             timeline=timeline,
             execution=execution,
         )

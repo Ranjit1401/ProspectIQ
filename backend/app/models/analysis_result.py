@@ -46,6 +46,11 @@ class AnalysisResult(Base):
         nullable=False,
     )
 
+    overall_assessment: Mapped[dict] = mapped_column(
+        JSONB,
+        nullable=False,
+    )
+
     timeline: Mapped[dict] = mapped_column(
         JSONB,
         nullable=False,

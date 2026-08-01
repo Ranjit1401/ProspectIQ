@@ -38,50 +38,11 @@ async def history(
 
     for analysis in analyses:
 
-        knowledge = (
-            db.query(KnowledgeSource)
-            .filter(
-                KnowledgeSource.id == analysis.knowledge_id
-            )
-            .first()
-        )
-
-        company = ""
-
-        if knowledge:
-            company = knowledge.processed_data.get(
-                "knowledge",
-                {},
-            ).get(
-                "company",
-                "",
-            )
-
         results.append(
             {
                 "analysis_id": analysis.id,
                 "knowledge_id": analysis.knowledge_id,
-                "company": company,
-                "decision_maker": analysis.persona.get(
-                    "primary_decision_maker",
-                    "",
-                ),
-                "intent_score": analysis.intent.get(
-                    "intent_score",
-                    0,
-                ),
-                "priority": analysis.intent.get(
-                    "priority",
-                    "",
-                ),
-                "risk_level": analysis.guardrail.get(
-                    "risk_level",
-                    "",
-                ),
-                "approved": analysis.guardrail.get(
-                    "approved",
-                    False,
-                ),
+                "overall_assessment": analysis.overall_assessment,
                 "created_at": analysis.created_at,
             }
         )
@@ -124,6 +85,7 @@ async def get_analysis(
 
     return {
         "analysis_id": analysis.id,
+        "overall_assessment": analysis.overall_assessment,
         "knowledge_id": analysis.knowledge_id,
         "knowledge": (
             knowledge.processed_data
@@ -166,7 +128,6 @@ async def delete_analysis(
         }
 
     db.delete(analysis)
-
     db.commit()
 
     return {
@@ -199,9 +160,8 @@ async def dashboard_stats(
         for analysis in analyses
         if analysis.intent.get(
             "priority",
-            "",
-        )
-        == "High"
+            ""
+        ) == "High"
     )
 
     approved = sum(
@@ -209,7 +169,7 @@ async def dashboard_stats(
         for analysis in analyses
         if analysis.guardrail.get(
             "approved",
-            False,
+            False
         )
     )
 
@@ -217,11 +177,22 @@ async def dashboard_stats(
         sum(
             analysis.intent.get(
                 "intent_score",
-                0,
+                0
             )
             for analysis in analyses
-        )
-        / total
+        ) / total
+        if total
+        else 0
+    )
+
+    average_execution_time = (
+        sum(
+            analysis.execution.get(
+                "total_time_ms",
+                0
+            )
+            for analysis in analyses
+        ) / total
         if total
         else 0
     )
@@ -234,4 +205,41 @@ async def dashboard_stats(
             average_intent,
             2,
         ),
+        "average_execution_time_ms": round(
+            average_execution_time,
+            2,
+        ),
+    }
+
+
+# ============================================================
+# Recent Analysis
+# ============================================================
+
+@router.get("/latest")
+async def latest_analysis(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+
+    analysis = (
+        db.query(AnalysisResult)
+        .filter(
+            AnalysisResult.user_id == current_user.id
+        )
+        .order_by(
+            AnalysisResult.created_at.desc()
+        )
+        .first()
+    )
+
+    if analysis is None:
+        return {
+            "message": "No analysis found"
+        }
+
+    return {
+        "analysis_id": analysis.id,
+        "overall_assessment": analysis.overall_assessment,
+        "created_at": analysis.created_at,
     }
