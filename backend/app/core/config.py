@@ -4,7 +4,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     """Application settings loaded from .env"""
 
-    APP_NAME: str = "RocketAI"
+    APP_NAME: str = "ProspectIQ"
     APP_VERSION: str = "0.1.0"
 
     DEBUG: bool = True

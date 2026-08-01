@@ -7,7 +7,9 @@ from app.agents.intent.agent import IntentAgent
 from app.agents.knowledge_ingestion.agent import KnowledgeIngestionAgent
 from app.agents.persona.agent import PersonaAgent
 from app.agents.strategy.agent import StrategyAgent
+
 from app.models.user import User
+
 from app.services.analysis_service import AnalysisService
 from app.services.knowledge_service import KnowledgeService
 
@@ -41,25 +43,31 @@ class AssistantService:
 
         timeline = []
 
-        # ---------------------------------------------------
-        # Step 1 - Knowledge Ingestion
-        # ---------------------------------------------------
+        # =====================================================
+        # Step 1 : Knowledge Ingestion
+        # =====================================================
 
-        normalized = await self.ingestion.ingest(
-            text=text,
-        )
+        step_start = time.perf_counter()
+
+        normalized = await self.ingestion.ingest(text=text)
 
         timeline.append(
             {
                 "step": 1,
                 "agent": "Knowledge Ingestion",
                 "status": "completed",
+                "duration_ms": round(
+                    (time.perf_counter() - step_start) * 1000,
+                    2,
+                ),
             }
         )
 
-        # ---------------------------------------------------
-        # Step 2 - Save Knowledge
-        # ---------------------------------------------------
+        # =====================================================
+        # Step 2 : Save Knowledge
+        # =====================================================
+
+        step_start = time.perf_counter()
 
         record = self.knowledge_service.save(
             db=db,
@@ -74,89 +82,140 @@ class AssistantService:
                 "step": 2,
                 "agent": "Knowledge Repository",
                 "status": "saved",
+                "duration_ms": round(
+                    (time.perf_counter() - step_start) * 1000,
+                    2,
+                ),
             }
         )
 
-        # ---------------------------------------------------
-        # Step 3 - Persona
-        # ---------------------------------------------------
+        # =====================================================
+        # Step 3 : Persona Agent
+        # =====================================================
 
-        persona = await self.persona.analyze(
-            knowledge,
-        )
+        step_start = time.perf_counter()
+
+        persona = await self.persona.analyze(knowledge)
 
         timeline.append(
             {
                 "step": 3,
                 "agent": "Persona Agent",
                 "status": "completed",
+                "duration_ms": round(
+                    (time.perf_counter() - step_start) * 1000,
+                    2,
+                ),
             }
         )
 
-        # ---------------------------------------------------
-        # Step 4 - Intent
-        # ---------------------------------------------------
+        # =====================================================
+        # Step 4 : Intent Agent
+        # =====================================================
 
-        intent = await self.intent.analyze(
-            knowledge,
-        )
+        step_start = time.perf_counter()
+
+        intent = await self.intent.analyze(knowledge)
 
         timeline.append(
             {
                 "step": 4,
                 "agent": "Intent Agent",
                 "status": "completed",
+                "duration_ms": round(
+                    (time.perf_counter() - step_start) * 1000,
+                    2,
+                ),
             }
         )
 
-        # ---------------------------------------------------
-        # Step 5 - Strategy
-        # ---------------------------------------------------
+        # =====================================================
+        # Step 5 : Strategy Agent
+        # =====================================================
 
-        strategy = await self.strategy.generate(
-            knowledge,
-        )
+        step_start = time.perf_counter()
+
+        strategy = await self.strategy.generate(knowledge)
 
         timeline.append(
             {
                 "step": 5,
                 "agent": "Strategy Agent",
                 "status": "completed",
+                "duration_ms": round(
+                    (time.perf_counter() - step_start) * 1000,
+                    2,
+                ),
             }
         )
 
-        # ---------------------------------------------------
-        # Step 6 - Guardrail
-        # ---------------------------------------------------
+        # =====================================================
+        # Step 6 : Guardrail Agent
+        # =====================================================
 
-        guardrail = await self.guardrail.verify(
-            knowledge,
-        )
+        step_start = time.perf_counter()
+
+        guardrail = await self.guardrail.verify(knowledge)
 
         timeline.append(
             {
                 "step": 6,
                 "agent": "Guardrail Agent",
                 "status": "completed",
+                "duration_ms": round(
+                    (time.perf_counter() - step_start) * 1000,
+                    2,
+                ),
             }
         )
 
-        # ---------------------------------------------------
+        # =====================================================
         # Execution Metrics
-        # ---------------------------------------------------
+        # =====================================================
+
+        total_time = round(
+            (time.perf_counter() - start_time) * 1000,
+            2,
+        )
 
         execution = {
-            "total_time_ms": round(
-                (time.perf_counter() - start_time) * 1000,
-                2,
-            ),
+            "total_time_ms": total_time,
             "agents_executed": 5,
             "knowledge_saved": True,
         }
 
-        # ---------------------------------------------------
-        # Save Full Analysis
-        # ---------------------------------------------------
+        # =====================================================
+        # Executive Summary
+        # =====================================================
+
+        overall_assessment = {
+            "company": knowledge.get("company", ""),
+            "decision_maker": (
+                persona.get("primary_decision_maker")
+                or (
+                    knowledge.get("decision_makers", [""])[0]
+                    if knowledge.get("decision_makers")
+                    else ""
+                )
+            ),
+            "intent_score": intent.get("intent_score", 0),
+            "buying_stage": intent.get("buying_stage", ""),
+            "priority": intent.get("priority", ""),
+            "risk_level": guardrail.get("risk_level", ""),
+            "approved": guardrail.get("approved", False),
+            "next_action": strategy.get(
+                "next_best_action",
+                "",
+            ),
+            "overall_recommendation": guardrail.get(
+                "recommendation",
+                "",
+            ),
+        }
+
+        # =====================================================
+        # Save Analysis
+        # =====================================================
 
         analysis = self.analysis_service.save(
             db=db,
@@ -170,18 +229,28 @@ class AssistantService:
             execution=execution,
         )
 
-        # ---------------------------------------------------
+        # =====================================================
         # Final Response
-        # ---------------------------------------------------
+        # =====================================================
 
         return {
             "analysis_id": analysis.id,
+
+            "overall_assessment": overall_assessment,
+
             "knowledge_id": record.id,
+
             "knowledge": knowledge,
+
             "persona": persona,
+
             "intent": intent,
+
             "strategy": strategy,
+
             "guardrail": guardrail,
+
             "timeline": timeline,
+
             "execution": execution,
         }
