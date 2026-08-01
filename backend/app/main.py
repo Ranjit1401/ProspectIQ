@@ -15,7 +15,8 @@ from app.api.knowledge import router as knowledge_router
 from app.api.persona import router as persona_router
 from app.api.intent import router as intent_router
 from app.api.strategy import router as strategy_router
-
+from app.api.guardrail import router as guardrail_router
+from app.api.assistant import router as assistant_router
 
 
 
@@ -39,6 +40,9 @@ app.include_router(knowledge_router)
 app.include_router(persona_router)
 app.include_router(intent_router)
 app.include_router(strategy_router)
+app.include_router(guardrail_router)
+app.include_router(assistant_router)
+
 
 @app.get("/")
 async def root():
