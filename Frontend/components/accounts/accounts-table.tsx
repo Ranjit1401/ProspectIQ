@@ -1,0 +1,94 @@
+"use client";
+
+import Link from "next/link";
+import { motion } from "framer-motion";
+import { ArrowUpRight } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { MOCK_COMPANIES } from "@/lib/mock-data";
+import type { ResearchStatus } from "@/types";
+
+const STATUS_VARIANT: Record<ResearchStatus, "success" | "warning" | "outline"> = {
+  analyzed: "success",
+  "in-review": "warning",
+  queued: "outline",
+};
+
+const STATUS_LABEL: Record<ResearchStatus, string> = {
+  analyzed: "Analyzed",
+  "in-review": "In review",
+  queued: "Queued",
+};
+
+export function AccountsTable() {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>All Accounts</CardTitle>
+      </CardHeader>
+      <CardContent className="p-0">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="border-y border-white/6 text-[11px] uppercase tracking-wider text-white/30">
+                <th className="px-5 py-3 font-medium">Company</th>
+                <th className="px-5 py-3 font-medium">Industry</th>
+                <th className="px-5 py-3 font-medium">Employees</th>
+                <th className="px-5 py-3 font-medium">Trust score</th>
+                <th className="px-5 py-3 font-medium">Status</th>
+                <th className="px-5 py-3" />
+              </tr>
+            </thead>
+            <tbody>
+              {MOCK_COMPANIES.map((company, i) => (
+                <motion.tr
+                  key={company.id}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: i * 0.03 }}
+                  className="group border-b border-white/4 transition-colors hover:bg-white/[0.02]"
+                >
+                  <td className="px-5 py-3.5">
+                    <div className="flex items-center gap-2.5">
+                      <Avatar className="h-7 w-7">
+                        <AvatarFallback>{company.logoInitial}</AvatarFallback>
+                      </Avatar>
+                      <span className="font-medium text-white/85">{company.name}</span>
+                    </div>
+                  </td>
+                  <td className="px-5 py-3.5 text-white/45">{company.industry}</td>
+                  <td className="px-5 py-3.5 text-white/45">{company.employees}</td>
+                  <td className="px-5 py-3.5">
+                    <span
+                      className={
+                        company.score >= 80
+                          ? "text-emerald-400"
+                          : company.score >= 60
+                            ? "text-amber-400"
+                            : "text-red-400"
+                      }
+                    >
+                      {company.score}
+                    </span>
+                  </td>
+                  <td className="px-5 py-3.5">
+                    <Badge variant={STATUS_VARIANT[company.status]}>{STATUS_LABEL[company.status]}</Badge>
+                  </td>
+                  <td className="px-5 py-3.5 text-right">
+                    <Link
+                      href={`/accounts/${company.id}`}
+                      className="inline-flex items-center gap-1 text-xs text-white/35 opacity-0 transition-opacity group-hover:opacity-100 hover:text-white"
+                    >
+                      View report <ArrowUpRight className="h-3 w-3" />
+                    </Link>
+                  </td>
+                </motion.tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
