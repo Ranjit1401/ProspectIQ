@@ -84,16 +84,14 @@ User Request:
             if data.get("tool") == "none":
                 return None
 
-            return data
+            return data.get("tool")
 
         except Exception:
 
             task_lower = task.lower()
 
             if any(op in task for op in ["+", "-", "*", "/", "%"]):
-                return {
-                    "tool": "calculator"
-                }
+                return "calculator"
 
             if any(word in task_lower for word in [
                 "weather",
@@ -101,16 +99,9 @@ User Request:
                 "temperature",
                 "climate",
             ]):
-                return {
-                    "tool": "weather"
-                }
+                return "weather"
 
-            return {
-                "tool": "search",
-                "queries": [
-                    task,
-                ],
-            }
+            return "search"
 
     async def extract_arguments(
         self,

@@ -48,6 +48,10 @@ class Supervisor:
             "task": task,
 
             "plan": plan,
+            
+            "agent": agent.name,
+
+            "result": result,
 
             # "research": research,
 
@@ -61,6 +65,6 @@ class Supervisor:
 
             # "guardrail": guardrail,
 
-            "memory": context.memory.get_history(),
+            "memory": context.memory.get_history(current_user.id),
 
         }
