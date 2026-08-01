@@ -18,8 +18,7 @@ from app.api.strategy import router as strategy_router
 from app.api.guardrail import router as guardrail_router
 from app.api.assistant import router as assistant_router
 from app.api.analysis import router as analysis_router
-
-
+from app.api.upload import router as upload_router
 
 
 
@@ -46,6 +45,7 @@ app.include_router(strategy_router)
 app.include_router(guardrail_router)
 app.include_router(assistant_router)
 app.include_router(analysis_router)
+app.include_router(upload_router)
 
 
 
