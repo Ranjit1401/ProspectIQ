@@ -7,11 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrustScoreCard, ConfidenceMeter, EvidenceList } from "@/components/report/trust-score-card";
 import { StakeholderCard, PainPointCard } from "@/components/report/stakeholder-card";
-import {
-  getStakeholdersByCompany,
-  getPainPointsByCompany,
-  MOCK_BUYING_SIGNALS,
-} from "@/lib/mock-data";
+import { accountsService } from "@/services/accounts.service";
+import type { BuyingSignal, PainPoint, Stakeholder } from "@/types";
 import {
   workspaceService,
   type CompanyDashboard,
@@ -30,6 +27,9 @@ export default function ExecutiveReportPage() {
   const id = params.id;
 
   const [dashboard, setDashboard] = useState<CompanyDashboard | null>(null);
+  const [stakeholders, setStakeholders] = useState<Stakeholder[]>([]);
+  const [painPoints, setPainPoints] = useState<PainPoint[]>([]);
+  const [buyingSignals, setBuyingSignals] = useState<BuyingSignal[]>([]);
   const [loading, setLoading] = useState(true);
   const [notFoundMsg, setNotFoundMsg] = useState<string | null>(null);
 
@@ -39,16 +39,23 @@ export default function ExecutiveReportPage() {
     setLoading(true);
     setNotFoundMsg(null);
 
-    workspaceService
-      .getCompanyDashboard(id)
-      .then((data) => {
+    Promise.all([
+      workspaceService.getCompanyDashboard(id),
+      accountsService.getStakeholders(id).catch(() => []),
+      accountsService.getPainPoints(id).catch(() => []),
+      accountsService.getBuyingSignals(id).catch(() => []),
+    ])
+      .then(([dashboardData, stakeholderData, painPointData, buyingSignalData]) => {
         if (cancelled) return;
-        if (isDashboardError(data)) {
-          setNotFoundMsg(data.error);
+        if (isDashboardError(dashboardData)) {
+          setNotFoundMsg(dashboardData.error);
           setDashboard(null);
         } else {
-          setDashboard(data);
+          setDashboard(dashboardData);
         }
+        setStakeholders(stakeholderData);
+        setPainPoints(painPointData);
+        setBuyingSignals(buyingSignalData);
       })
       .catch((err) => {
         if (cancelled) return;
@@ -82,16 +89,9 @@ export default function ExecutiveReportPage() {
     );
   }
 
-  // Stakeholders/pain points aren't backed by a real endpoint yet, so these
-  // stay on mock data keyed by string ids and will render empty for real
-  // (numeric) companies until the backend exposes dedicated endpoints.
-  const stakeholders = getStakeholdersByCompany(id);
-  const painPoints = getPainPointsByCompany(id);
-  const evidence = [
-    "Q3 engineering blog post referencing platform-strategy fragmentation",
-    "FY26 infra tooling budget approval mentioned in earnings call",
-    "InfraCon 2025 speaker bio and session transcript",
-  ];
+  const evidence =
+    stakeholders.flatMap((s) => s.evidence ?? []).slice(0, 6) ||
+    [];
 
   const company = dashboard.company;
   const logoInitial = company.name?.[0]?.toUpperCase() ?? "?";
@@ -163,8 +163,8 @@ export default function ExecutiveReportPage() {
           <div className="space-y-3">
             {stakeholders.length === 0 && (
               <p className="text-xs text-white/30">
-                No stakeholder data yet — this section is still backed by mock data pending a
-                dedicated backend endpoint.
+                No stakeholders extracted yet — run this company&apos;s notes through the AI
+                Workspace with named contacts to populate this section.
               </p>
             )}
             {stakeholders.map((s) => (
@@ -177,8 +177,7 @@ export default function ExecutiveReportPage() {
           <div className="space-y-3">
             {painPoints.length === 0 && (
               <p className="text-xs text-white/30">
-                No pain point data yet — this section is still backed by mock data pending a
-                dedicated backend endpoint.
+                No pain points extracted yet from this company&apos;s ingested knowledge.
               </p>
             )}
             {painPoints.map((p) => (
@@ -188,16 +187,16 @@ export default function ExecutiveReportPage() {
         </div>
       </div>
 
-      <EvidenceList items={evidence} />
+      {evidence.length > 0 && <EvidenceList items={evidence} />}
 
-      {MOCK_BUYING_SIGNALS.length > 0 && (
+      {buyingSignals.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle>Buying Signals</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2.5">
-            {MOCK_BUYING_SIGNALS.map((signal) => (
-              <div key={signal.id} className="rounded-lg border border-white/6 bg-white/[0.02] p-3">
+            {buyingSignals.map((signal, i) => (
+              <div key={`${signal.title}-${i}`} className="rounded-lg border border-white/6 bg-white/[0.02] p-3">
                 <div className="flex items-center justify-between">
                   <span className="text-[13px] text-white/70">{signal.title}</span>
                   <Badge variant={signal.strength === "strong" ? "success" : "outline"}>{signal.strength}</Badge>

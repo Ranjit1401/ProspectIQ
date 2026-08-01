@@ -1,16 +1,14 @@
-import type { Company, PainPoint, Stakeholder, ResearchStatus } from "@/types";
-import {
-  getCompanyById,
-  getPainPointsByCompany,
-  getStakeholdersByCompany,
-} from "@/lib/mock-data";
+import type { BuyingSignal, Company, PainPoint, Stakeholder, ResearchStatus } from "@/types";
+import { getCompanyById } from "@/lib/mock-data";
 import { workspaceService, type WorkspaceCompanySummary } from "./workspace.service";
 
 /**
- * Company-level list now comes from the real backend (GET /workspace/),
- * which reflects whatever you've actually run through the AI Workspace
- * chat. Per-company stakeholders/pain-points still fall back to mock
- * data — the backend doesn't expose dedicated endpoints for those yet.
+ * Company-level list, stakeholders, pain points, and buying signals all
+ * come from the real backend now (GET /workspace/...), derived from
+ * whatever you've actually run through the AI Workspace chat. The
+ * mock-data fallback in getById only applies to demo company ids that
+ * were never run through the pipeline (e.g. straight from the landing
+ * page mock deck).
  */
 function toCompany(summary: WorkspaceCompanySummary): Company {
   return {
@@ -38,10 +36,14 @@ export const accountsService = {
   },
 
   async getStakeholders(companyId: string): Promise<Stakeholder[]> {
-    return getStakeholdersByCompany(companyId);
+    return workspaceService.getStakeholders(companyId) as Promise<Stakeholder[]>;
   },
 
   async getPainPoints(companyId: string): Promise<PainPoint[]> {
-    return getPainPointsByCompany(companyId);
+    return workspaceService.getPainPoints(companyId) as Promise<PainPoint[]>;
+  },
+
+  async getBuyingSignals(companyId: string): Promise<BuyingSignal[]> {
+    return workspaceService.getBuyingSignals(companyId) as Promise<BuyingSignal[]>;
   },
 };

@@ -10,6 +10,7 @@ from app.models.company import Company
 from app.models.user import User
 from statistics import mean
 from app.models.knowledge_source import KnowledgeSource
+import re
 
 
 router = APIRouter(
@@ -729,3 +730,256 @@ async def company_activity(
         "total_events": len(timeline),
         "timeline": timeline,
     }
+
+
+# =========================================================
+# Stakeholders / Pain Points / Buying Signals / Graph
+#
+# These derive from the raw extracted knowledge (contacts,
+# decision_makers, pain_points, buying_signals) attached to a company's
+# most recent analysis, rather than a separate table — the knowledge
+# extraction agent already produces this data, it just wasn't exposed
+# yet.
+# =========================================================
+
+
+def _slugify(value: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
+    return slug or "unknown"
+
+
+def _latest_knowledge_for_company(
+    db: Session,
+    company_id: int,
+    user_id: int,
+):
+    latest_analysis = (
+        db.query(AnalysisResult)
+        .filter(
+            AnalysisResult.company_id == company_id,
+            AnalysisResult.user_id == user_id,
+        )
+        .order_by(AnalysisResult.created_at.desc())
+        .first()
+    )
+
+    if latest_analysis is None:
+        return None, None
+
+    knowledge_source = (
+        db.query(KnowledgeSource)
+        .filter(KnowledgeSource.id == latest_analysis.knowledge_id)
+        .first()
+    )
+
+    if knowledge_source is None:
+        return latest_analysis, None
+
+    return latest_analysis, knowledge_source.processed_data.get("knowledge", {})
+
+
+def _infer_influence(name: str, role: str, primary_decision_maker: str) -> str:
+    role_lower = (role or "").lower()
+
+    if name and primary_decision_maker and name.strip().lower() == primary_decision_maker.strip().lower():
+        return "Decision Maker"
+
+    if any(k in role_lower for k in ["cfo", "finance", "budget", "procurement"]):
+        return "Budget Holder"
+
+    if any(k in role_lower for k in ["security", "compliance", "legal", "risk"]):
+        return "Blocker"
+
+    if any(k in role_lower for k in ["vp", "head", "director", "lead"]):
+        return "Champion"
+
+    return "Influencer"
+
+
+@router.get("/company/{company_id}/stakeholders")
+async def company_stakeholders(
+    company_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    analysis, knowledge = _latest_knowledge_for_company(db, company_id, current_user.id)
+
+    if analysis is None:
+        return []
+
+    knowledge = knowledge or {}
+    persona = analysis.persona or {}
+    primary_decision_maker = persona.get("primary_decision_maker", "")
+
+    contacts = knowledge.get("contacts", []) or []
+    pain_points = knowledge.get("pain_points", []) or []
+    buying_signals = knowledge.get("buying_signals", []) or []
+    confidence = knowledge.get("confidence", 0) or 0
+
+    # Fall back to the plain decision_makers list if no structured
+    # contacts were extracted, so the screen isn't empty just because
+    # the source text didn't include emails/phone numbers.
+    if not contacts:
+        contacts = [
+            {"name": name, "role": "", "email": "", "phone": ""}
+            for name in (knowledge.get("decision_makers", []) or [])
+        ]
+
+    stakeholders = []
+
+    for contact in contacts:
+        name = contact.get("name", "") or "Unknown"
+        role = contact.get("role", "")
+
+        stakeholders.append(
+            {
+                "id": _slugify(f"{company_id}-{name}"),
+                "name": name,
+                "title": role or "Unknown role",
+                "dept": role.split(" ")[0] if role else "General",
+                "influence": _infer_influence(name, role, primary_decision_maker),
+                "score": confidence,
+                "linkedin": False,
+                "email": contact.get("email", "") or "",
+                "companyId": str(company_id),
+                "evidence": knowledge.get("sources", []) or [],
+                "painPoints": pain_points,
+                "buyingSignals": buying_signals,
+            }
+        )
+
+    return stakeholders
+
+
+@router.get("/company/{company_id}/pain-points")
+async def company_pain_points(
+    company_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    analysis, knowledge = _latest_knowledge_for_company(db, company_id, current_user.id)
+
+    if analysis is None:
+        return []
+
+    knowledge = knowledge or {}
+    points = knowledge.get("pain_points", []) or []
+    confidence = knowledge.get("confidence", 0) or 0
+    source_count = max(len(knowledge.get("sources", []) or []), 1)
+
+    result = []
+
+    for i, point in enumerate(points):
+        severity = "critical" if i == 0 else "high" if i == 1 else "medium"
+
+        result.append(
+            {
+                "id": _slugify(f"{company_id}-pain-{i}-{point}"),
+                "title": point if len(point) <= 80 else point[:77] + "...",
+                "severity": severity,
+                "confidence": confidence,
+                "sources": source_count,
+                "excerpt": point,
+                "companyId": str(company_id),
+            }
+        )
+
+    return result
+
+
+@router.get("/company/{company_id}/buying-signals")
+async def company_buying_signals(
+    company_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    analysis, knowledge = _latest_knowledge_for_company(db, company_id, current_user.id)
+
+    if analysis is None:
+        return []
+
+    knowledge = knowledge or {}
+    signals = knowledge.get("buying_signals", []) or []
+
+    result = []
+
+    for i, signal in enumerate(signals):
+        result.append(
+            {
+                "id": _slugify(f"{company_id}-signal-{i}-{signal}"),
+                "title": signal,
+                "strength": "strong" if i == 0 else "moderate",
+                "detectedAt": analysis.created_at.date().isoformat(),
+                "source": "Extracted from ingested notes",
+            }
+        )
+
+    return result
+
+
+@router.get("/company/{company_id}/graph")
+async def company_graph(
+    company_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    analysis, knowledge = _latest_knowledge_for_company(db, company_id, current_user.id)
+
+    if analysis is None:
+        return {"nodes": [], "edges": []}
+
+    knowledge = knowledge or {}
+    persona = analysis.persona or {}
+    primary_decision_maker = persona.get("primary_decision_maker", "")
+
+    contacts = knowledge.get("contacts", []) or []
+    if not contacts:
+        contacts = [
+            {"name": name, "role": ""}
+            for name in (knowledge.get("decision_makers", []) or [])
+        ]
+
+    pain_points = knowledge.get("pain_points", []) or []
+    buying_signals = knowledge.get("buying_signals", []) or []
+    confidence = knowledge.get("confidence", 0) or 0
+
+    nodes = []
+    decision_maker_id = None
+
+    for contact in contacts:
+        name = contact.get("name", "") or "Unknown"
+        role = contact.get("role", "")
+        node_id = _slugify(f"{company_id}-{name}")
+        influence = _infer_influence(name, role, primary_decision_maker)
+
+        if influence == "Decision Maker":
+            decision_maker_id = node_id
+
+        nodes.append(
+            {
+                "id": node_id,
+                "name": name,
+                "title": role or "Unknown role",
+                "influence": influence,
+                "confidence": confidence,
+                "evidence": knowledge.get("sources", []) or [],
+                "painPoints": pain_points,
+                "buyingSignals": buying_signals,
+            }
+        )
+
+    edges = []
+
+    if decision_maker_id:
+        for node in nodes:
+            if node["id"] != decision_maker_id:
+                edges.append(
+                    {
+                        "id": f"{node['id']}-{decision_maker_id}",
+                        "source": node["id"],
+                        "target": decision_maker_id,
+                        "label": "reports to",
+                    }
+                )
+
+    return {"nodes": nodes, "edges": edges}

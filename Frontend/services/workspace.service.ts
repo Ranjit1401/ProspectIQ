@@ -119,6 +119,62 @@ export interface SupervisorResponse {
   memory: SupervisorMemoryEntry[];
 }
 
+export interface StakeholderApiResult {
+  id: string;
+  name: string;
+  title: string;
+  dept: string;
+  influence: "Decision Maker" | "Champion" | "Budget Holder" | "Influencer" | "Blocker";
+  score: number;
+  linkedin: boolean;
+  email: string;
+  companyId: string;
+  evidence: string[];
+  painPoints: string[];
+  buyingSignals: string[];
+}
+
+export interface PainPointApiResult {
+  id: string;
+  title: string;
+  severity: "critical" | "high" | "medium" | "low";
+  confidence: number;
+  sources: number;
+  excerpt: string;
+  companyId: string;
+}
+
+export interface BuyingSignalApiResult {
+  id: string;
+  title: string;
+  strength: "strong" | "moderate" | "weak";
+  detectedAt: string;
+  source: string;
+}
+
+export interface GraphNodeApiResult {
+  id: string;
+  name: string;
+  title: string;
+  influence: "Decision Maker" | "Champion" | "Budget Holder" | "Influencer" | "Blocker";
+  confidence: number;
+  evidence: string[];
+  painPoints: string[];
+  buyingSignals: string[];
+}
+
+export interface GraphEdgeApiResult {
+  id: string;
+  source: string;
+  target: string;
+  label?: string;
+}
+
+export interface CompanyGraphResponse {
+  nodes: GraphNodeApiResult[];
+  edges: GraphEdgeApiResult[];
+}
+
 export const workspaceService = {
   /**
    * Sends free-form text to the Supervisor, which plans the task, routes
@@ -161,5 +217,25 @@ export const workspaceService = {
     return apiFetch<CompanyDashboard | CompanyDashboardError>(
       `/workspace/company/${companyId}/dashboard`,
     );
+  },
+
+  /** Stakeholders derived from the company's most recent extracted knowledge. */
+  async getStakeholders(companyId: number | string): Promise<StakeholderApiResult[]> {
+    return apiFetch<StakeholderApiResult[]>(`/workspace/company/${companyId}/stakeholders`);
+  },
+
+  /** Pain points derived from the company's most recent extracted knowledge. */
+  async getPainPoints(companyId: number | string): Promise<PainPointApiResult[]> {
+    return apiFetch<PainPointApiResult[]>(`/workspace/company/${companyId}/pain-points`);
+  },
+
+  /** Buying signals derived from the company's most recent extracted knowledge. */
+  async getBuyingSignals(companyId: number | string): Promise<BuyingSignalApiResult[]> {
+    return apiFetch<BuyingSignalApiResult[]>(`/workspace/company/${companyId}/buying-signals`);
+  },
+
+  /** Relationship graph (nodes + edges) for the Relationship Graph screen. */
+  async getGraph(companyId: number | string): Promise<CompanyGraphResponse> {
+    return apiFetch<CompanyGraphResponse>(`/workspace/company/${companyId}/graph`);
   },
 };
