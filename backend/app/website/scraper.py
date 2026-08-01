@@ -3,6 +3,7 @@ from bs4 import BeautifulSoup
 
 
 class WebsiteScraper:
+    MAX_CHARS = 8000
 
     @staticmethod
     def scrape(url: str) -> str:
@@ -45,5 +46,7 @@ class WebsiteScraper:
             separator="\n",
             strip=True,
         )
+        if len(text) > WebsiteScraper.MAX_CHARS:      
+            text = text[: WebsiteScraper.MAX_CHARS]
 
         return text

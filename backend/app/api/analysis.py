@@ -49,6 +49,38 @@ async def history(
 
     return results
 
+# ============================================================
+# Recent Analysis
+# ============================================================
+
+@router.get("/latest")
+async def latest_analysis(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+
+    analysis = (
+        db.query(AnalysisResult)
+        .filter(
+            AnalysisResult.user_id == current_user.id
+        )
+        .order_by(
+            AnalysisResult.created_at.desc()
+        )
+        .first()
+    )
+
+    if analysis is None:
+        return {
+            "message": "No analysis found"
+        }
+
+    return {
+        "analysis_id": analysis.id,
+        "overall_assessment": analysis.overall_assessment,
+        "created_at": analysis.created_at,
+    }
+
 
 # ============================================================
 # Get Single Analysis
@@ -212,34 +244,3 @@ async def dashboard_stats(
     }
 
 
-# ============================================================
-# Recent Analysis
-# ============================================================
-
-@router.get("/latest")
-async def latest_analysis(
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-
-    analysis = (
-        db.query(AnalysisResult)
-        .filter(
-            AnalysisResult.user_id == current_user.id
-        )
-        .order_by(
-            AnalysisResult.created_at.desc()
-        )
-        .first()
-    )
-
-    if analysis is None:
-        return {
-            "message": "No analysis found"
-        }
-
-    return {
-        "analysis_id": analysis.id,
-        "overall_assessment": analysis.overall_assessment,
-        "created_at": analysis.created_at,
-    }
