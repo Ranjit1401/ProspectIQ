@@ -1,65 +1,74 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Check, Loader2, ShieldAlert } from "lucide-react";
+import { Check, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import type { AgentProgressStep } from "@/types";
+import type { TimelineEntry } from "@/services/workspace.service";
 import { cn } from "@/lib/utils";
 
-const STEPS: AgentProgressStep[] = [
-  { id: "ingest", label: "Ingesting sources", status: "done", detail: "147 pages, 3 documents" },
-  { id: "research", label: "Research agent", status: "done", detail: "12,400 tokens extracted" },
-  { id: "stakeholder", label: "Stakeholder mapping", status: "done", detail: "4 stakeholders identified" },
-  { id: "pain_point", label: "Pain point detection", status: "active", detail: "Cross-referencing evidence" },
-  { id: "buying_signal", label: "Buying signal detection", status: "pending" },
-  { id: "strategy", label: "Strategy generation", status: "pending" },
-  { id: "guardrail", label: "Guardrail check", status: "pending" },
-  { id: "confidence", label: "Confidence scoring", status: "pending" },
-  { id: "approval", label: "Awaiting human approval", status: "pending" },
-];
+interface AgentProgressProps {
+  timeline: TimelineEntry[];
+  running?: boolean;
+}
 
-export function AgentProgress() {
+export function AgentProgress({ timeline, running }: AgentProgressProps) {
+  if (timeline.length === 0 && !running) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Agent Progress</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-[13px] text-white/35">
+            Send a message in the chat to kick off the research pipeline — steps will appear here as
+            each agent runs.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>Agent Progress</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
-        {STEPS.map((step, i) => (
+        {timeline.map((step, i) => (
           <motion.div
-            key={step.id}
+            key={`${step.step}-${step.agent}`}
             initial={{ opacity: 0, x: -8 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: i * 0.05 }}
             className="flex items-start gap-3"
           >
-            <div
-              className={cn(
-                "mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border",
-                step.status === "done" && "border-emerald-500/40 bg-emerald-500/15 text-emerald-400",
-                step.status === "active" && "border-white/30 bg-white/10 text-white",
-                step.status === "pending" && "border-white/10 text-white/20",
-                step.status === "blocked" && "border-amber-500/40 bg-amber-500/15 text-amber-400",
-              )}
-            >
-              {step.status === "done" && <Check className="h-3 w-3" />}
-              {step.status === "active" && <Loader2 className="h-3 w-3 animate-spin" />}
-              {step.status === "blocked" && <ShieldAlert className="h-3 w-3" />}
-              {step.status === "pending" && <span className="h-1 w-1 rounded-full bg-current" />}
+            <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-emerald-500/40 bg-emerald-500/15 text-emerald-400">
+              <Check className="h-3 w-3" />
             </div>
             <div>
-              <p
-                className={cn(
-                  "text-[13px]",
-                  step.status === "pending" ? "text-white/30" : "text-white/85",
-                )}
-              >
-                {step.label}
+              <p className="text-[13px] text-white/85">{step.agent}</p>
+              <p className="text-[11px] text-white/35">
+                {step.status} · {step.duration_ms} ms
               </p>
-              {step.detail && <p className="text-[11px] text-white/35">{step.detail}</p>}
             </div>
           </motion.div>
         ))}
+
+        {running && (
+          <motion.div initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} className="flex items-start gap-3">
+            <div
+              className={cn(
+                "mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-white/30 bg-white/10 text-white",
+              )}
+            >
+              <Loader2 className="h-3 w-3 animate-spin" />
+            </div>
+            <div>
+              <p className="text-[13px] text-white/85">Running pipeline…</p>
+              <p className="text-[11px] text-white/35">Waiting on the agents to finish</p>
+            </div>
+          </motion.div>
+        )}
       </CardContent>
     </Card>
   );

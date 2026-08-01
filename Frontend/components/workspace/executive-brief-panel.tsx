@@ -1,43 +1,99 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScoreRing } from "@/components/common/score-ring";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { MOCK_COMPANIES } from "@/lib/mock-data";
+import { accountsService } from "@/services/accounts.service";
+import type { Company } from "@/types";
+import type { OverallAssessment, KnowledgeData } from "@/services/workspace.service";
 
-export function ExecutiveBriefPanel() {
+interface ExecutiveBriefPanelProps {
+  assessment: OverallAssessment | null;
+  knowledge: KnowledgeData | null;
+}
+
+export function ExecutiveBriefPanel({ assessment, knowledge }: ExecutiveBriefPanelProps) {
+  if (!assessment) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Executive Brief</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-[13px] leading-relaxed text-white/40">
+            No analysis yet. Send a company brief or notes in the chat and the executive summary will
+            appear here once the pipeline finishes.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const score = Math.round((assessment.intent_score ?? 0) * (assessment.intent_score <= 1 ? 100 : 1));
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
-        <CardTitle>Executive Brief — Anthropic</CardTitle>
-        <ScoreRing score={94} size={54} label="" />
+        <CardTitle>Executive Brief — {assessment.company || knowledge?.company || "Unknown"}</CardTitle>
+        <ScoreRing score={score} size={54} label="" />
       </CardHeader>
       <CardContent className="space-y-3">
         <p className="text-[13px] leading-relaxed text-white/50">
-          Engineering leadership has publicly flagged fragmented tooling as a
-          platform-strategy blocker, and FY26 infra budget has been approved.
-          Recommended motion: lead with a platform-consolidation angle to the CTO.
+          {assessment.overall_recommendation || "No recommendation returned by the guardrail agent."}
         </p>
         <div className="flex flex-wrap gap-2">
-          <Badge variant="danger">Critical pain point</Badge>
-          <Badge variant="success">Budget approved</Badge>
-          <Badge variant="outline">4 stakeholders</Badge>
+          {assessment.risk_level && (
+            <Badge variant={assessment.risk_level.toLowerCase() === "high" ? "danger" : "outline"}>
+              {assessment.risk_level} risk
+            </Badge>
+          )}
+          {assessment.approved ? (
+            <Badge variant="success">Approved</Badge>
+          ) : (
+            <Badge variant="danger">Needs review</Badge>
+          )}
+          {assessment.buying_stage && <Badge variant="outline">{assessment.buying_stage}</Badge>}
+          {assessment.decision_maker && <Badge variant="outline">{assessment.decision_maker}</Badge>}
         </div>
-        <Link
-          href="/accounts/anthropic"
-          className="inline-flex items-center gap-1 text-xs text-white/50 hover:text-white transition-colors"
-        >
-          View full report <ArrowUpRight className="h-3 w-3" />
-        </Link>
+        {assessment.next_action && (
+          <p className="text-xs text-white/40">
+            Next action: <span className="text-white/70">{assessment.next_action}</span>
+          </p>
+        )}
       </CardContent>
     </Card>
   );
 }
 
 export function HistorySidebar() {
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    accountsService
+      .list()
+      .then((data) => {
+        if (!cancelled) setCompanies(data);
+      })
+      .catch(() => {
+        // Keep the sidebar empty rather than surfacing an error here —
+        // it's a secondary panel, not the primary action on this page.
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
     <Card className="flex h-full flex-col">
       <CardHeader>
@@ -45,7 +101,15 @@ export function HistorySidebar() {
       </CardHeader>
       <ScrollArea className="flex-1 px-2 pb-4">
         <div className="space-y-1 px-3">
-          {MOCK_COMPANIES.map((company) => (
+          {loading && <p className="px-2 py-2 text-xs text-white/30">Loading…</p>}
+
+          {!loading && companies.length === 0 && (
+            <p className="px-2 py-2 text-xs text-white/30">
+              Nothing analyzed yet — send a brief in the chat to start your first session.
+            </p>
+          )}
+
+          {companies.map((company) => (
             <Link
               key={company.id}
               href={`/accounts/${company.id}`}

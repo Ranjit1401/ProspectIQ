@@ -9,9 +9,20 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { authService } from "@/services/auth.service";
+import { useCurrentUser } from "@/components/auth/auth-guard";
+
+function initials(name: string) {
+  return name
+    .split(/[\s._-]+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("") || "?";
+}
 
 export function ProfileForm() {
   const router = useRouter();
+  const user = useCurrentUser();
 
   function handleLogout() {
     authService.logout();
@@ -27,21 +38,23 @@ export function ProfileForm() {
         <CardContent className="space-y-4">
           <div className="flex items-center gap-4">
             <Avatar className="h-14 w-14">
-              <AvatarFallback className="text-base">AK</AvatarFallback>
+              <AvatarFallback className="text-base">
+                {user ? initials(user.username) : "?"}
+              </AvatarFallback>
             </Avatar>
             <div>
-              <p className="text-sm font-medium text-white/90">Alex Kim</p>
-              <p className="text-xs text-white/40">AE Lead</p>
+              <p className="text-sm font-medium text-white/90">{user?.username ?? "—"}</p>
+              <p className="text-xs text-white/40">{user?.email ?? ""}</p>
             </div>
           </div>
           <Separator />
           <div className="space-y-1.5">
             <Label htmlFor="fullname">Full name</Label>
-            <Input id="fullname" defaultValue="Alex Kim" />
+            <Input id="fullname" defaultValue={user?.username ?? ""} />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="email">Email</Label>
-            <Input id="email" type="email" defaultValue="alex@company.com" />
+            <Input id="email" type="email" defaultValue={user?.email ?? ""} />
           </div>
           <Button size="sm">Save changes</Button>
         </CardContent>

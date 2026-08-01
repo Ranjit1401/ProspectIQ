@@ -4,10 +4,21 @@ import { usePathname } from "next/navigation";
 import { Search, Bell } from "lucide-react";
 import { NAV_ITEMS } from "@/lib/constants";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { useCurrentUser } from "@/components/auth/auth-guard";
+
+function initials(name: string) {
+  return name
+    .split(/[\s._-]+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("") || "?";
+}
 
 export function Topbar({ onOpenPalette }: { onOpenPalette: () => void }) {
   const pathname = usePathname();
   const current = NAV_ITEMS.find((item) => pathname?.startsWith(item.href));
+  const user = useCurrentUser();
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-white/6 bg-[#090909]/70 px-6 backdrop-blur-xl">
@@ -32,7 +43,7 @@ export function Topbar({ onOpenPalette }: { onOpenPalette: () => void }) {
           <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-white" />
         </button>
         <Avatar className="h-8 w-8 lg:hidden">
-          <AvatarFallback>AK</AvatarFallback>
+          <AvatarFallback>{user ? initials(user.username) : "?"}</AvatarFallback>
         </Avatar>
       </div>
     </header>
