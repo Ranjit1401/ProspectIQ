@@ -16,6 +16,13 @@ export interface AuthResponse {
   token_type: string;
 }
 
+export interface CurrentUser {
+  id: number;
+  username: string;
+  email: string;
+  is_active: boolean;
+}
+
 export const authService = {
   async login(payload: LoginPayload): Promise<AuthResponse> {
     const result = await apiFetch<AuthResponse>("/auth/login", {
@@ -33,6 +40,10 @@ export const authService = {
       body: JSON.stringify(payload),
       auth: false,
     });
+  },
+
+  async me(): Promise<CurrentUser> {
+    return apiFetch<CurrentUser>("/auth/me");
   },
 
   logout() {

@@ -98,6 +98,35 @@ export interface ChatMessage {
   role: "user" | "assistant" | "system";
   content: string;
   timestamp: string;
+  /**
+   * Optional presentation kind for the AI Workspace's live conversation.
+   * Defaults to a plain text bubble when omitted, so existing consumers
+   * (mock data, other screens) are unaffected.
+   */
+  kind?: "text" | "loading" | "stream" | "report";
+  /** Chip labels shown under a user message, e.g. attached files/sources. */
+  attachments?: string[];
+  /** Ordered live steps for a "stream" message. */
+  steps?: WorkspaceStreamStep[];
+  /** Resource chips revealed so far for a "stream" message. */
+  chips?: string[];
+  /** Present when kind is "report" — drives the completion card. */
+  report?: WorkspaceReportCompletion | null;
+}
+
+export interface WorkspaceStreamStep {
+  id: string;
+  label: string;
+  status: "active" | "done";
+}
+
+export interface WorkspaceReportCompletion {
+  company?: string;
+  recommendation?: string;
+  riskLevel?: string;
+  buyingStage?: string;
+  nextAction?: string;
+  approved?: boolean;
 }
 
 export interface OutreachDraft {

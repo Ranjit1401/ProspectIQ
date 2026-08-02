@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Check, X, Pencil, Mail, Linkedin, Phone } from "lucide-react";
+import { Check, X, Mail, Linkedin, Phone, Loader2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,9 +13,38 @@ import { cn } from "@/lib/utils";
 
 const CHANNEL_ICON = { email: Mail, linkedin: Linkedin, "call-script": Phone };
 
-export function OutreachCard({ draft }: { draft: OutreachDraft }) {
+export function OutreachCard({
+  draft,
+  onApprove,
+  onReject,
+}: {
+  draft: OutreachDraft;
+  onApprove?: (id: string) => Promise<void>;
+  onReject?: (id: string) => Promise<void>;
+}) {
   const [status, setStatus] = useState(draft.status);
+  const [pendingAction, setPendingAction] = useState<"approve" | "reject" | null>(null);
   const ChannelIcon = CHANNEL_ICON[draft.channel];
+
+  async function handleApprove() {
+    setPendingAction("approve");
+    try {
+      if (onApprove) await onApprove(draft.id);
+      setStatus("approved");
+    } finally {
+      setPendingAction(null);
+    }
+  }
+
+  async function handleReject() {
+    setPendingAction("reject");
+    try {
+      if (onReject) await onReject(draft.id);
+      setStatus("rejected");
+    } finally {
+      setPendingAction(null);
+    }
+  }
 
   return (
     <motion.div layout initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
@@ -70,19 +99,26 @@ export function OutreachCard({ draft }: { draft: OutreachDraft }) {
             <span className="text-[11px] text-white/25">Queued for approval</span>
             {status === "pending" ? (
               <div className="flex gap-2">
-                <Button size="sm" variant="outline" onClick={() => setStatus("rejected")}>
-                  <X className="h-3.5 w-3.5" /> Reject
+                <Button size="sm" variant="outline" onClick={handleReject} disabled={pendingAction !== null}>
+                  {pendingAction === "reject" ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <X className="h-3.5 w-3.5" />
+                  )}{" "}
+                  Reject
                 </Button>
-                <Button size="sm" variant="secondary">
-                  <Pencil className="h-3.5 w-3.5" /> Edit
-                </Button>
-                <Button size="sm" onClick={() => setStatus("approved")}>
-                  <Check className="h-3.5 w-3.5" /> Approve
+                <Button size="sm" onClick={handleApprove} disabled={pendingAction !== null}>
+                  {pendingAction === "approve" ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Check className="h-3.5 w-3.5" />
+                  )}{" "}
+                  Approve
                 </Button>
               </div>
             ) : (
-              <Badge variant={status === "approved" ? "success" : "danger"}>
-                {status === "approved" ? "Approved" : "Rejected"}
+              <Badge variant={status === "approved" ? "success" : status === "edited" ? "outline" : "danger"}>
+                {status === "approved" ? "Approved" : status === "edited" ? "Edited" : "Rejected"}
               </Badge>
             )}
           </div>

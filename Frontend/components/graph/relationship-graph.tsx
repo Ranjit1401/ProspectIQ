@@ -13,36 +13,62 @@ import ReactFlow, {
 import "reactflow/dist/style.css";
 import { StakeholderNode, type StakeholderNodeData } from "@/components/graph/custom-node";
 import { NodeInfoPanel } from "@/components/graph/node-info-panel";
-import { MOCK_NODES, MOCK_EDGES } from "@/lib/mock-data";
-import type { RelationshipNode } from "@/types";
+import type { RelationshipEdge, RelationshipNode } from "@/types";
 
 const nodeTypes = { stakeholder: StakeholderNode };
 
-const LAYOUT: Record<string, { x: number; y: number }> = {
-  "sarah-chen": { x: 260, y: 20 },
-  "marcus-webb": { x: 60, y: 200 },
-  "priya-nair": { x: 460, y: 200 },
-  "daniel-torres": { x: 260, y: 380 },
-  "alex-kim": { x: 500, y: 380 },
-};
+/**
+ * Real accounts don't come with hand-placed coordinates, so lay nodes
+ * out automatically: the Decision Maker (if any) goes top-center, and
+ * everyone else fans out below in a simple arc. Good enough for a
+ * handful of stakeholders; swap for a proper force layout if accounts
+ * routinely have 10+ contacts.
+ */
+function computeLayout(nodes: RelationshipNode[]): Record<string, { x: number; y: number }> {
+  const layout: Record<string, { x: number; y: number }> = {};
 
-export function RelationshipGraph() {
+  const decisionMaker = nodes.find((n) => n.influence === "Decision Maker");
+  const rest = nodes.filter((n) => n !== decisionMaker);
+
+  if (decisionMaker) {
+    layout[decisionMaker.id] = { x: 280, y: 20 };
+  }
+
+  const spacing = 220;
+  const startX = 280 - ((rest.length - 1) * spacing) / 2;
+
+  rest.forEach((node, i) => {
+    layout[node.id] = { x: startX + i * spacing, y: 240 };
+  });
+
+  return layout;
+}
+
+export function RelationshipGraph({
+  nodes: relationshipNodes,
+  edges: relationshipEdges,
+}: {
+  nodes: RelationshipNode[];
+  edges: RelationshipEdge[];
+}) {
   const [activeNode, setActiveNode] = useState<RelationshipNode | null>(null);
+
+  const layout = useMemo(() => computeLayout(relationshipNodes), [relationshipNodes]);
 
   const nodes: Node<StakeholderNodeData>[] = useMemo(
     () =>
-      MOCK_NODES.map((n) => ({
+      relationshipNodes.map((n) => ({
         id: n.id,
         type: "stakeholder",
-        position: LAYOUT[n.id] ?? { x: 0, y: 0 },
+        position: layout[n.id] ?? { x: 0, y: 0 },
         data: { name: n.name, title: n.title, influence: n.influence, confidence: n.confidence },
       })),
-    [],
+    [relationshipNodes, layout],
   );
 
   const edges: Edge[] = useMemo(
     () =>
-      MOCK_EDGES.map((e) => ({
+      relationshipEdges.map((e) => ({
         id: e.id,
         source: e.source,
         target: e.target,
@@ -52,13 +78,27 @@ export function RelationshipGraph() {
         labelStyle: { fill: "rgba(255,255,255,0.4)", fontSize: 10 },
         labelBgStyle: { fill: "#0c0c0c", fillOpacity: 0.8 },
       })),
-    [],
+    [relationshipEdges],
   );
 
-  const handleNodeMouseEnter: NodeMouseHandler = useCallback((_, node) => {
-    const found = MOCK_NODES.find((n) => n.id === node.id) ?? null;
-    setActiveNode(found);
-  }, []);
+  const handleNodeMouseEnter: NodeMouseHandler = useCallback(
+    (_, node) => {
+      const found = relationshipNodes.find((n) => n.id === node.id) ?? null;
+      setActiveNode(found);
+    },
+    [relationshipNodes],
+  );
+
+  if (relationshipNodes.length === 0) {
+    return (
+      <div className="flex h-[calc(100vh-11rem)] items-center justify-center rounded-2xl border border-white/8 bg-[#0c0c0c]">
+        <p className="max-w-sm text-center text-xs text-white/30">
+          No stakeholders extracted yet for this account. Run its notes through the AI Workspace
+          with named contacts to populate the relationship graph.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="relative h-[calc(100vh-11rem)] overflow-hidden rounded-2xl border border-white/8 bg-[#0c0c0c]">
