@@ -1,3 +1,6 @@
+from collections import defaultdict
+from datetime import datetime, timedelta
+
 from fastapi import APIRouter, Depends
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -11,7 +14,6 @@ from app.models.user import User
 from statistics import mean
 from app.models.knowledge_source import KnowledgeSource
 import re
-
 
 router = APIRouter(
     prefix="/workspace",
@@ -35,25 +37,35 @@ async def workspace(
         .all()
     )
 
+    # Single bulk query instead of one query per company (N+1) — this is
+    # what was making the page take 10-15s with more than a handful of
+    # accounts, since each extra query is a full network round trip to
+    # the database.
+    all_analyses = (
+        db.query(AnalysisResult)
+        .filter(AnalysisResult.user_id == current_user.id)
+        .order_by(AnalysisResult.created_at.asc())
+        .all()
+    )
+
+    analyses_by_company: dict[int, list[AnalysisResult]] = defaultdict(list)
+    for analysis in all_analyses:
+        analyses_by_company[analysis.company_id].append(analysis)
+
     response = []
 
     for company in companies:
 
-        analyses = (
-            db.query(AnalysisResult)
-            .filter(
-                AnalysisResult.company_id == company.id,
-                AnalysisResult.user_id == current_user.id,
-            )
-            .all()
-        )
+        analyses = analyses_by_company.get(company.id, [])
+
+        if not analyses:
+            continue
 
         total = len(analyses)
 
-        latest = max(
-            analyses,
-            key=lambda x: x.created_at,
-        )
+        # analyses_by_company lists are already sorted ascending by
+        # created_at (from the query above), so the last one is latest.
+        latest = analyses[-1]
 
         response.append(
             {
@@ -75,6 +87,178 @@ async def workspace(
         )
 
     return response
+@router.get("/stats")
+async def workspace_stats(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Aggregate real numbers for the Accounts dashboard: the four stat
+    cards (total accounts, avg trust score, guardrail catches,
+    stakeholders mapped) and the four charts (research status donut,
+    pain points by industry, research activity over time, trust score
+    distribution). Everything here is derived from this user's actual
+    companies/analyses/knowledge — nothing hardcoded.
+    """
+
+    companies = (
+        db.query(Company)
+        .join(AnalysisResult)
+        .filter(AnalysisResult.user_id == current_user.id)
+        .distinct()
+        .all()
+    )
+
+    all_analyses = (
+        db.query(AnalysisResult)
+        .filter(AnalysisResult.user_id == current_user.id)
+        .order_by(AnalysisResult.created_at.asc())
+        .all()
+    )
+
+    now = datetime.utcnow()
+    week_ago = now - timedelta(days=7)
+    two_weeks_ago = now - timedelta(days=14)
+
+    # Latest + first analysis per company (analyses are sorted ascending,
+    # so the last write for a company_id in the loop is always its latest).
+    latest_by_company: dict[int, AnalysisResult] = {}
+    first_created_by_company: dict[int, datetime] = {}
+
+    for analysis in all_analyses:
+        latest_by_company[analysis.company_id] = analysis
+        first_created_by_company.setdefault(analysis.company_id, analysis.created_at)
+
+    # ---- Stat cards ----
+    total_accounts = len(companies)
+    new_accounts_this_week = sum(
+        1 for created in first_created_by_company.values() if created >= week_ago
+    )
+
+    trust_scores = [
+        latest_by_company[c.id].intent.get("intent_score", 0) or 0
+        for c in companies
+        if c.id in latest_by_company
+    ]
+    avg_trust_score = round(mean(trust_scores)) if trust_scores else 0
+
+    recent_scores = [
+        a.intent.get("intent_score", 0) or 0
+        for a in all_analyses
+        if a.created_at >= week_ago
+    ]
+    prior_scores = [
+        a.intent.get("intent_score", 0) or 0
+        for a in all_analyses
+        if two_weeks_ago <= a.created_at < week_ago
+    ]
+    trust_score_delta = (
+        round(mean(recent_scores) - mean(prior_scores), 1)
+        if recent_scores and prior_scores
+        else None
+    )
+
+    guardrail_catches = sum(
+        1 for a in all_analyses if not a.guardrail.get("approved", True)
+    )
+    guardrail_catches_this_week = sum(
+        1
+        for a in all_analyses
+        if not a.guardrail.get("approved", True) and a.created_at >= week_ago
+    )
+
+    # ---- Per-company breakdown for the charts (status, pain points,
+    # trust buckets) — pulls each company's latest extracted knowledge. ----
+    status_counts = {"analyzed": 0, "in-review": 0, "queued": 0}
+    industry_pain_counts: dict[str, int] = defaultdict(int)
+    trust_buckets = {"0-20": 0, "21-40": 0, "41-60": 0, "61-80": 0, "81-100": 0}
+    stakeholders_mapped = 0
+
+    # Single bulk query for every knowledge source we'll need, instead of
+    # one query per company (N+1) — this was the main cause of the slow
+    # page load, since each extra query is a full DB round trip.
+    needed_knowledge_ids = {
+        latest_by_company[c.id].knowledge_id
+        for c in companies
+        if c.id in latest_by_company
+    }
+    knowledge_by_id: dict[int, dict] = {}
+    if needed_knowledge_ids:
+        knowledge_sources = (
+            db.query(KnowledgeSource)
+            .filter(KnowledgeSource.id.in_(needed_knowledge_ids))
+            .all()
+        )
+        knowledge_by_id = {
+            ks.id: (ks.processed_data.get("knowledge", {}) or {}) for ks in knowledge_sources
+        }
+
+    for company in companies:
+        latest = latest_by_company.get(company.id)
+
+        if latest is None:
+            status_counts["queued"] += 1
+            continue
+
+        status_counts["analyzed" if latest.guardrail.get("approved", True) else "in-review"] += 1
+
+        score = latest.intent.get("intent_score", 0) or 0
+        if score <= 20:
+            bucket_label = "0-20"
+        elif score <= 40:
+            bucket_label = "21-40"
+        elif score <= 60:
+            bucket_label = "41-60"
+        elif score <= 80:
+            bucket_label = "61-80"
+        else:
+            bucket_label = "81-100"
+        trust_buckets[bucket_label] += 1
+
+        knowledge = knowledge_by_id.get(latest.knowledge_id, {})
+
+        pain_points = knowledge.get("pain_points", []) or []
+        industry = company.industry or "Unknown"
+        industry_pain_counts[industry] += len(pain_points)
+
+        contacts = knowledge.get("contacts", []) or []
+        if not contacts:
+            contacts = knowledge.get("decision_makers", []) or []
+        stakeholders_mapped += len(contacts)
+
+    # ---- Research activity: analyses per day over the last 14 days ----
+    activity_by_day: dict[str, int] = defaultdict(int)
+    for analysis in all_analyses:
+        activity_by_day[analysis.created_at.date().isoformat()] += 1
+
+    last_14_days = [(now - timedelta(days=i)).date().isoformat() for i in range(13, -1, -1)]
+    research_activity = [
+        {"date": day, "analyses": activity_by_day.get(day, 0)} for day in last_14_days
+    ]
+
+    top_industries = sorted(
+        industry_pain_counts.items(), key=lambda kv: kv[1], reverse=True
+    )[:6]
+
+    return {
+        "total_accounts": total_accounts,
+        "new_accounts_this_week": new_accounts_this_week,
+        "avg_trust_score": avg_trust_score,
+        "trust_score_delta": trust_score_delta,
+        "guardrail_catches": guardrail_catches,
+        "guardrail_catches_this_week": guardrail_catches_this_week,
+        "stakeholders_mapped": stakeholders_mapped,
+        "research_status": [
+            {"status": status, "count": count} for status, count in status_counts.items()
+        ],
+        "pain_points_by_industry": [
+            {"industry": industry, "count": count} for industry, count in top_industries
+        ],
+        "research_activity": research_activity,
+        "trust_distribution": [
+            {"bucket": bucket, "count": count} for bucket, count in trust_buckets.items()
+        ],
+    }
 
 @router.get("/company/{company_id}")
 async def company_details(

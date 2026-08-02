@@ -175,6 +175,40 @@ export interface CompanyGraphResponse {
   edges: GraphEdgeApiResult[];
 }
 
+export interface ResearchStatusSliceApiResult {
+  status: "analyzed" | "in-review" | "queued";
+  count: number;
+}
+
+export interface PainPointsByIndustryApiResult {
+  industry: string;
+  count: number;
+}
+
+export interface ResearchActivityApiResult {
+  date: string;
+  analyses: number;
+}
+
+export interface TrustDistributionApiResult {
+  bucket: string;
+  count: number;
+}
+
+export interface WorkspaceStats {
+  total_accounts: number;
+  new_accounts_this_week: number;
+  avg_trust_score: number;
+  trust_score_delta: number | null;
+  guardrail_catches: number;
+  guardrail_catches_this_week: number;
+  stakeholders_mapped: number;
+  research_status: ResearchStatusSliceApiResult[];
+  pain_points_by_industry: PainPointsByIndustryApiResult[];
+  research_activity: ResearchActivityApiResult[];
+  trust_distribution: TrustDistributionApiResult[];
+}
+
 export const workspaceService = {
   /**
    * Sends free-form text to the Supervisor, which plans the task, routes
@@ -209,6 +243,10 @@ export const workspaceService = {
   async listCompanies(): Promise<WorkspaceCompanySummary[]> {
     return apiFetch<WorkspaceCompanySummary[]>("/workspace/");
   },
+  
+  async getStats(): Promise<WorkspaceStats> {
+    return apiFetch<WorkspaceStats>("/workspace/stats");
+  },
 
   /** Full rollup for one company: latest intent/persona/strategy/guardrail. */
   async getCompanyDashboard(
@@ -237,5 +275,14 @@ export const workspaceService = {
   /** Relationship graph (nodes + edges) for the Relationship Graph screen. */
   async getGraph(companyId: number | string): Promise<CompanyGraphResponse> {
     return apiFetch<CompanyGraphResponse>(`/workspace/company/${companyId}/graph`);
+  },
+
+  /** Recent analysis history for the current user. */
+  async getAnalysisHistory(): Promise<any[]> {
+    return apiFetch<any[]>("/analysis/history");
+  },
+
+  async getAnalysis(id: number): Promise<AnalyzeResponse> {
+    return apiFetch<AnalyzeResponse>(`/analysis/${id}`);
   },
 };

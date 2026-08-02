@@ -9,7 +9,10 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { accountsService } from "@/services/accounts.service";
 import { ApiError } from "@/services/api-client";
+import { fetchWithCache, getCached } from "@/lib/data-cache";
 import type { Company, ResearchStatus } from "@/types";
+
+const COMPANIES_CACHE_KEY = "workspace:companies";
 
 const STATUS_VARIANT: Record<ResearchStatus, "success" | "warning" | "outline"> = {
   analyzed: "success",
@@ -24,8 +27,11 @@ const STATUS_LABEL: Record<ResearchStatus, string> = {
 };
 
 export function AccountsTable() {
-  const [companies, setCompanies] = useState<Company[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Seed from cache synchronously so a repeat visit paints instantly.
+  const [companies, setCompanies] = useState<Company[]>(
+    () => getCached<Company[]>(COMPANIES_CACHE_KEY) ?? [],
+  );
+  const [loading, setLoading] = useState(() => getCached<Company[]>(COMPANIES_CACHE_KEY) === undefined);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -33,8 +39,15 @@ export function AccountsTable() {
 
     async function load() {
       try {
-        const data = await accountsService.list();
-        if (!cancelled) setCompanies(data);
+        const data = await fetchWithCache(COMPANIES_CACHE_KEY, () => accountsService.list(), {
+          onRevalidate: (fresh) => {
+            if (!cancelled) setCompanies(fresh);
+          },
+        });
+        if (!cancelled) {
+          setCompanies(data);
+          setError(null);
+        }
       } catch (err) {
         if (!cancelled) {
           setError(
