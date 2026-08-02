@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Check, X, ChevronLeft, ChevronRight, Loader2, Mail, Linkedin, Phone } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -31,7 +31,47 @@ export function OutreachReviewPanel({
   onReject: (id: string) => Promise<void>;
 }) {
   const [pendingAction, setPendingAction] = useState<"approve" | "reject" | null>(null);
+
+  const [subject, setSubject] = useState(draft.subject);
+  const [body, setBody] = useState(draft.body);
+  const [recipient, setRecipient] = useState("");
+  const [senderConnected, setSenderConnected] = useState(false);
+  const [connectedEmail, setConnectedEmail] = useState("");
+
+  // Check Gmail connection status on initial mount
+  useEffect(() => {
+    async function loadGmailStatus() {
+      try {
+        // TODO: Replace with actual service call `await authService.gmailStatus()`
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/google/status`);
+        const res = await response.json();
+
+        setSenderConnected(res.connected);
+        setConnectedEmail(res.email || "");
+      } catch (err) {
+        console.error("Failed to fetch Gmail status", err);
+      }
+    }
+
+    loadGmailStatus();
+  }, []);
+
+  // Sync draft fields and pre-fill recipient when active draft changes
+  useEffect(() => {
+    setSubject(draft.subject);
+    setBody(draft.body);
+    setRecipient("");
+  }, [draft]);
+
   const ChannelIcon = CHANNEL_ICON[draft.channel];
+
+  async function handleConnectGmail() {
+    try {
+      window.location.href = `${process.env.NEXT_PUBLIC_API_URL}/auth/google/connect`;
+    } catch (err) {
+      console.error(err);
+    }
+  }
 
   async function handleApprove() {
     setPendingAction("approve");
@@ -50,6 +90,21 @@ export function OutreachReviewPanel({
       setPendingAction(null);
     }
   }
+
+  const handleApproveAndSend = async () => {
+    // Pipeline reference:
+    // await queueService.sendEmail({ draftId: draft.id, recipient, subject, body });
+    console.log("Sending email via Gmail API...", {
+      draftId: draft.id,
+      senderConnected,
+      connectedEmail,
+      recipient,
+      subject,
+      body,
+    });
+
+    await handleApprove();
+  };
 
   return (
     <div className="space-y-4">
@@ -89,21 +144,73 @@ export function OutreachReviewPanel({
                 <div className="flex items-center gap-2 text-[11px] text-white/40">
                   <ChannelIcon className="h-3.5 w-3.5" /> {draft.channel}
                 </div>
-                <Badge variant={draft.status === "approved" ? "success" : draft.status === "rejected" ? "danger" : draft.status === "edited" ? "outline" : "warning"}>
+                <Badge
+                  variant={
+                    draft.status === "approved"
+                      ? "success"
+                      : draft.status === "rejected"
+                      ? "danger"
+                      : draft.status === "edited"
+                      ? "outline"
+                      : "warning"
+                  }
+                >
                   {draft.status}
                 </Badge>
               </div>
               <div className="space-y-3 p-5">
-                <div>
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wider text-white/30">
+                      Sender Account
+                    </p>
+
+                    {senderConnected ? (
+                      <div className="mt-1 flex items-center justify-between rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-400">
+                        <span>{connectedEmail}</span>
+                        <span className="text-xs font-medium text-emerald-500">Connected</span>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={handleConnectGmail}
+                        className="mt-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-500"
+                      >
+                        Connect Gmail
+                      </button>
+                    )}
+                  </div>
+
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wider text-white/30">
+                      Recipient
+                    </p>
+
+                    <input
+                      value={recipient}
+                      onChange={(e) => setRecipient(e.target.value)}
+                      placeholder="recipient@company.com"
+                      className="mt-2 w-full rounded-lg border border-white/10 bg-transparent px-3 py-2 text-sm outline-none focus:border-white/20"
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-2">
                   <p className="text-[10px] uppercase tracking-wider text-white/30">Subject</p>
-                  <p className="mt-1 text-[13px] font-medium text-white/85">{draft.subject}</p>
+                  <input
+                    value={subject}
+                    onChange={(e) => setSubject(e.target.value)}
+                    className="mt-2 w-full rounded-lg border border-white/10 bg-transparent px-3 py-2 text-sm outline-none focus:border-white/20"
+                  />
                 </div>
                 <Separator />
                 <div>
                   <p className="text-[10px] uppercase tracking-wider text-white/30">Message</p>
-                  <p className="mt-1.5 whitespace-pre-line text-[13px] leading-relaxed text-white/55">
-                    {draft.body}
-                  </p>
+                  <textarea
+                    rows={12}
+                    value={body}
+                    onChange={(e) => setBody(e.target.value)}
+                    className="mt-2 w-full rounded-lg border border-white/10 bg-transparent p-3 text-sm outline-none focus:border-white/20"
+                  />
                 </div>
               </div>
             </Card>
@@ -111,7 +218,9 @@ export function OutreachReviewPanel({
             <Card>
               <div className="space-y-3 p-5">
                 <div>
-                  <p className="text-[10px] uppercase tracking-wider text-white/30">Why this draft (Reasoning)</p>
+                  <p className="text-[10px] uppercase tracking-wider text-white/30">
+                    Why this draft (Reasoning)
+                  </p>
                   <p className="mt-1.5 text-[13px] leading-relaxed text-white/55">
                     {draft.reasoning || "No reasoning recorded for this draft."}
                   </p>
@@ -121,7 +230,9 @@ export function OutreachReviewPanel({
                   <>
                     <Separator />
                     <div>
-                      <p className="mb-1.5 text-[10px] uppercase tracking-wider text-white/30">Supporting Evidence</p>
+                      <p className="mb-1.5 text-[10px] uppercase tracking-wider text-white/30">
+                        Supporting Evidence
+                      </p>
                       <div className="flex flex-wrap gap-1.5">
                         {draft.evidence.map((e) => (
                           <span
@@ -141,12 +252,23 @@ export function OutreachReviewPanel({
             {draft.status === "pending" || draft.status === "edited" ? (
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={handleReject} disabled={pendingAction !== null}>
-                  {pendingAction === "reject" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <X className="h-3.5 w-3.5" />}
+                  {pendingAction === "reject" ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <X className="h-3.5 w-3.5" />
+                  )}
                   Reject
                 </Button>
-                <Button onClick={handleApprove} disabled={pendingAction !== null}>
-                  {pendingAction === "approve" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
-                  Approve
+                <Button
+                  disabled={!recipient || !senderConnected || pendingAction !== null}
+                  onClick={handleApproveAndSend}
+                >
+                  {pendingAction === "approve" ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Check className="h-3.5 w-3.5" />
+                  )}
+                  Approve & Send
                 </Button>
               </div>
             ) : (
@@ -168,7 +290,9 @@ export function OutreachReviewPanel({
 
             <Card>
               <div className="p-5">
-                <p className="mb-3 text-[10px] uppercase tracking-wider text-white/30">Outreach Workflow</p>
+                <p className="mb-3 text-[10px] uppercase tracking-wider text-white/30">
+                  Outreach Workflow
+                </p>
                 <OutreachTimeline draft={draft} />
               </div>
             </Card>

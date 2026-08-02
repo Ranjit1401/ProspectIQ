@@ -10,6 +10,7 @@ export interface Company {
   status: ResearchStatus;
   country: string;
   logoInitial?: string;
+  recipientEmail?: string;
 }
 
 export type StakeholderInfluence =
