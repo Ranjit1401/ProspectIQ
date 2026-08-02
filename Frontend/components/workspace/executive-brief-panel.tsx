@@ -7,14 +7,20 @@ import { ScoreRing } from "@/components/common/score-ring";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { workspaceService } from "@/services/workspace.service";
-import type { OverallAssessment, KnowledgeData } from "@/services/workspace.service";
+import type {
+  OverallAssessment,
+  KnowledgeData,
+} from "@/services/workspace.service";
 
 interface ExecutiveBriefPanelProps {
   assessment: OverallAssessment | null;
   knowledge: KnowledgeData | null;
 }
 
-export function ExecutiveBriefPanel({ assessment, knowledge }: ExecutiveBriefPanelProps) {
+export function ExecutiveBriefPanel({
+  assessment,
+  knowledge,
+}: ExecutiveBriefPanelProps) {
   if (!assessment) {
     return (
       <Card>
@@ -23,29 +29,42 @@ export function ExecutiveBriefPanel({ assessment, knowledge }: ExecutiveBriefPan
         </CardHeader>
         <CardContent>
           <p className="text-[13px] leading-relaxed text-white/40">
-            No analysis yet. Send a company brief or notes in the chat and the executive summary will
-            appear here once the pipeline finishes.
+            No analysis yet. Send a company brief or notes in the chat and the
+            executive summary will appear here once the pipeline finishes.
           </p>
         </CardContent>
       </Card>
     );
   }
 
-  const score = Math.round((assessment.intent_score ?? 0) * ((assessment.intent_score ?? 0) <= 1 ? 100 : 1));
+  const score = Math.round(
+    (assessment.intent_score ?? 0) *
+      ((assessment.intent_score ?? 0) <= 1 ? 100 : 1),
+  );
 
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
-        <CardTitle>Executive Brief — {assessment.company || knowledge?.company || "Unknown"}</CardTitle>
+        <CardTitle>
+          Executive Brief —{" "}
+          {assessment.company || knowledge?.company || "Unknown"}
+        </CardTitle>
         <ScoreRing score={score} size={54} label="" />
       </CardHeader>
       <CardContent className="space-y-3">
         <p className="text-[13px] leading-relaxed text-white/50">
-          {assessment.overall_recommendation || "No recommendation returned by the guardrail agent."}
+          {assessment.overall_recommendation ||
+            "No recommendation returned by the guardrail agent."}
         </p>
         <div className="flex flex-wrap gap-2">
           {assessment.risk_level && (
-            <Badge variant={assessment.risk_level.toLowerCase() === "high" ? "danger" : "outline"}>
+            <Badge
+              variant={
+                assessment.risk_level.toLowerCase() === "high"
+                  ? "danger"
+                  : "outline"
+              }
+            >
               {assessment.risk_level} risk
             </Badge>
           )}
@@ -54,12 +73,17 @@ export function ExecutiveBriefPanel({ assessment, knowledge }: ExecutiveBriefPan
           ) : (
             <Badge variant="danger">Needs review</Badge>
           )}
-          {assessment.buying_stage && <Badge variant="outline">{assessment.buying_stage}</Badge>}
-          {assessment.decision_maker && <Badge variant="outline">{assessment.decision_maker}</Badge>}
+          {assessment.buying_stage && (
+            <Badge variant="outline">{assessment.buying_stage}</Badge>
+          )}
+          {assessment.decision_maker && (
+            <Badge variant="outline">{assessment.decision_maker}</Badge>
+          )}
         </div>
         {assessment.next_action && (
           <p className="text-xs text-white/40">
-            Next action: <span className="text-white/70">{assessment.next_action}</span>
+            Next action:{" "}
+            <span className="text-white/70">{assessment.next_action}</span>
           </p>
         )}
       </CardContent>
@@ -67,7 +91,11 @@ export function ExecutiveBriefPanel({ assessment, knowledge }: ExecutiveBriefPan
   );
 }
 
-export function HistorySidebar() {
+export function HistorySidebar({
+  onSelect,
+}: {
+  onSelect: (id: number) => void;
+}) {
   const [sessions, setSessions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -98,24 +126,29 @@ export function HistorySidebar() {
       </CardHeader>
       <ScrollArea className="flex-1 px-2 pb-4">
         <div className="space-y-1 px-3">
-          {loading && <p className="px-2 py-2 text-xs text-white/30">Loading…</p>}
+          {loading && (
+            <p className="px-2 py-2 text-xs text-white/30">Loading…</p>
+          )}
 
           {!loading && sessions.length === 0 && (
             <p className="px-2 py-2 text-xs text-white/30">
-              Nothing analyzed yet — send a brief in the chat to start your first session.
+              Nothing analyzed yet — send a brief in the chat to start your
+              first session.
             </p>
           )}
 
           {sessions.map((session, index) => {
-            const companyName = session?.overall_assessment?.company || "Unknown Company";
+            const companyName =
+              session?.overall_assessment?.company || "Unknown Company";
             const initial = companyName.charAt(0).toUpperCase();
-            const intentScore = session?.overall_assessment?.intent_score ?? "N/A";
+            const intentScore =
+              session?.overall_assessment?.intent_score ?? "N/A";
             const analysisId = session?.analysis_id || `session-${index}`;
 
             return (
-              <Link
+              <button
                 key={analysisId}
-                href={`/analysis/${analysisId}`}
+                onClick={() => onSelect(analysisId)}
                 className="flex items-center justify-between rounded-lg px-2 py-2 text-xs text-white/45 transition-colors hover:bg-white/[0.04] hover:text-white/80"
               >
                 <span className="flex items-center gap-2">
@@ -125,10 +158,8 @@ export function HistorySidebar() {
                   <span>{companyName}</span>
                 </span>
 
-                <span className="text-[10px] text-white/25">
-                  {intentScore}
-                </span>
-              </Link>
+                <span className="text-[10px] text-white/25">{intentScore}</span>
+              </button>
             );
           })}
         </div>

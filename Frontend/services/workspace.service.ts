@@ -269,4 +269,9 @@ export const workspaceService = {
   async getAnalysisHistory(): Promise<any[]> {
     return apiFetch<any[]>("/analysis/history");
   },
+
+  async getAnalysis(id: number): Promise<AnalyzeResponse> {
+    return apiFetch<AnalyzeResponse>(`/analysis/${id}`);
+  },
 };
+

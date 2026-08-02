@@ -25,6 +25,7 @@ export function WorkspaceClient() {
   const [messages, setMessages] = useState<ChatMessage[]>([WELCOME]);
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState<AnalyzeResponse | null>(null);
+  const [selectedAnalysisId, setSelectedAnalysisId] = useState<number | null>(null);
 
   function patchMessage(id: string, patch: Partial<ChatMessage>) {
     setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, ...patch } : m)));
@@ -145,10 +146,20 @@ export function WorkspaceClient() {
     setSending(false);
   }
 
+  async function handleHistorySelect(id: number) {
+    try {
+      const analysis = await workspaceService.getAnalysis(id);
+      setResult(analysis);
+      setSelectedAnalysisId(id);
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
   return (
     <div className="grid h-[calc(100vh-8rem)] grid-cols-1 gap-5 lg:grid-cols-[240px_1fr_300px]">
       <div className="hidden lg:block">
-        <HistorySidebar />
+        <HistorySidebar onSelect={handleHistorySelect} />
       </div>
 
       <div className="min-h-0">
