@@ -183,11 +183,13 @@ export const workspaceService = {
    * returns whichever result that agent produced.
    */
   async runSupervisor(prompt: string): Promise<SupervisorResponse> {
-    return apiFetch<SupervisorResponse>(
-      `/supervisor/execute?prompt=${encodeURIComponent(prompt)}`,
-      { method: "POST" },
-    );
-  },
+  return apiFetch<SupervisorResponse>(
+    `/executor/run?prompt=${encodeURIComponent(prompt)}`,
+    {
+      method: "GET",
+    },
+  );
+},
 
   /**
    * Runs the full multi-agent pipeline (ingestion -> persona -> intent ->

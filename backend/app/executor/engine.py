@@ -10,7 +10,12 @@ class ExecutionEngine:
     def __init__(self):
         self.supervisor = Supervisor()
 
-    async def execute(self, task: str):
+    async def execute(
+        self,
+        task: str,
+        current_user,
+        db,
+    ):
 
         timeline = ExecutionTimeline()
 
@@ -18,7 +23,11 @@ class ExecutionEngine:
 
         timeline.add_event("Calling Supervisor")
 
-        result = await self.supervisor.execute(task)
+        result = await self.supervisor.execute(
+            task=task,
+            current_user=current_user,
+            db=db,
+        )
 
         timeline.add_event("Supervisor completed")
 

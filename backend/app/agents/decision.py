@@ -4,8 +4,9 @@ import re
 
 class DecisionEngine:
     """
-    Uses the LLM to decide which tool should be used and
-    generates a research plan.
+    Decides which tool(s) should be used for a task.
+
+    Returns a research plan instead of only a tool name.
     """
 
     def __init__(self, llm):
@@ -16,20 +17,18 @@ class DecisionEngine:
         prompt = f"""
 You are ProspectIQ's Research Planner.
 
-Available tools:
+Available tools
 
 1. calculator
 2. weather
 3. search
 4. news
-   - Latest company news
-   - Funding
-   - Partnerships
-   - Acquisitions
-   - Product launches
-For company research, DO NOT perform only one search.
 
-Generate multiple focused search queries.
+Rules:
+
+- If the user asks about a company, create MULTIPLE search queries.
+- Never perform only one search for company research.
+- Return ONLY valid JSON.
 
 Example:
 
@@ -47,19 +46,17 @@ Example:
     ]
 }}
 
-For calculator:
+Calculator:
 
 {{"tool":"calculator"}}
 
-For weather:
+Weather:
 
 {{"tool":"weather"}}
 
-If no tool is required:
+No tool:
 
 {{"tool":"none"}}
-
-Return ONLY valid JSON.
 
 User Request:
 
@@ -68,7 +65,11 @@ User Request:
 
         response = await self.llm.generate(prompt)
 
-        content = response.content.strip()
+        content = (
+            response.content
+            if hasattr(response, "content")
+            else str(response)
+        ).strip()
 
         if content.startswith("```"):
             content = (
@@ -84,14 +85,28 @@ User Request:
             if data.get("tool") == "none":
                 return None
 
-            return data.get("tool")
+            # Ensure queries always exist for search
+            if data.get("tool") == "search":
+
+                if not data.get("queries"):
+
+                    data["queries"] = [task]
+
+            return data
 
         except Exception:
 
             task_lower = task.lower()
 
+            # Calculator
+
             if any(op in task for op in ["+", "-", "*", "/", "%"]):
-                return "calculator"
+
+                return {
+                    "tool": "calculator",
+                }
+
+            # Weather
 
             if any(word in task_lower for word in [
                 "weather",
@@ -99,9 +114,19 @@ User Request:
                 "temperature",
                 "climate",
             ]):
-                return "weather"
 
-            return "search"
+                return {
+                    "tool": "weather",
+                }
+
+            # Default
+
+            return {
+                "tool": "search",
+                "queries": [
+                    task,
+                ],
+            }
 
     async def extract_arguments(
         self,
@@ -110,6 +135,10 @@ User Request:
         query: str | None = None,
     ):
 
+        # -----------------------
+        # Calculator
+        # -----------------------
+
         if tool == "calculator":
 
             match = re.search(
@@ -117,13 +146,21 @@ User Request:
                 task,
             )
 
-            expression = match.group().strip() if match else task
+            expression = (
+                match.group().strip()
+                if match
+                else task
+            )
 
             return {
                 "expression": expression,
             }
 
-        elif tool == "weather":
+        # -----------------------
+        # Weather
+        # -----------------------
+
+        if tool == "weather":
 
             city = (
                 task.lower()
@@ -141,21 +178,33 @@ User Request:
                 "city": city.title(),
             }
 
-        elif tool == "search":
+        # -----------------------
+        # Search
+        # -----------------------
 
-            if query:
-
-                return {
-                    "query": query,
-                }
+        if tool == "search":
 
             return {
-                "query": task,
+                "query": query if query else task,
             }
 
-        elif tool == "news":
+        # -----------------------
+        # News
+        # -----------------------
+
+        if tool == "news":
+
+            company = (
+                task.lower()
+                .replace("give me report on", "")
+                .replace("report on", "")
+                .replace("tell me about", "")
+                .replace("company", "")
+                .strip()
+            )
+
             return {
-                "company": task,
+                "company": company.title(),
             }
 
         return {}

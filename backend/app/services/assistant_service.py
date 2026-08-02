@@ -1,5 +1,4 @@
 import time
-
 from sqlalchemy.orm import Session
 
 from app.agents.guardrail.agent import GuardrailAgent
@@ -13,26 +12,19 @@ from app.models.user import User
 from app.services.analysis_service import AnalysisService
 from app.services.knowledge_service import KnowledgeService
 from app.services.company_service import CompanyService
+from app.core.context import context
 
 
 class AssistantService:
 
     def __init__(self):
-
         self.ingestion = KnowledgeIngestionAgent()
-
         self.knowledge_service = KnowledgeService()
-
         self.analysis_service = AnalysisService()
-
         self.persona = PersonaAgent()
-
         self.intent = IntentAgent()
-
         self.strategy = StrategyAgent()
-
         self.guardrail = GuardrailAgent()
-
         self.company_service = CompanyService()
 
     async def analyze(
@@ -41,15 +33,46 @@ class AssistantService:
         current_user: User,
         db: Session,
     ):
-
         start_time = time.perf_counter()
-
         timeline = []
+
+        # =====================================================
+        # Step 0 : Research Agent
+        # =====================================================
+        step_start = time.perf_counter()
+
+        research_agent = context.agent_registry.get("research")
+
+        # Safety Check: Guard against missing agent or infinite recursion loops
+        if not research_agent or research_agent.__class__.__name__ == "SalesAnalysisAgent":
+            raise ValueError("Registry Error: 'research' agent returned an invalid or cyclic instance.")
+
+        # Future-proof method call passing user and DB session context
+        research = await research_agent.run(
+            task=text,
+            current_user=current_user,
+            db=db,
+        )
+
+        # Send research evidence into downstream knowledge pipeline
+        if research and isinstance(research, dict) and research.get("evidence"):
+            text = research["evidence"]
+
+        timeline.append(
+            {
+                "step": 0,
+                "agent": "Research Agent",
+                "status": "completed",
+                "duration_ms": round(
+                    (time.perf_counter() - step_start) * 1000,
+                    2,
+                ),
+            }
+        )
 
         # =====================================================
         # Step 1 : Knowledge Ingestion
         # =====================================================
-
         step_start = time.perf_counter()
 
         normalized = await self.ingestion.ingest(text=text)
@@ -69,7 +92,6 @@ class AssistantService:
         # =====================================================
         # Step 2 : Save Knowledge
         # =====================================================
-
         step_start = time.perf_counter()
 
         record = self.knowledge_service.save(
@@ -102,7 +124,6 @@ class AssistantService:
         # =====================================================
         # Step 3 : Persona Agent
         # =====================================================
-
         step_start = time.perf_counter()
 
         persona = await self.persona.analyze(knowledge)
@@ -122,7 +143,6 @@ class AssistantService:
         # =====================================================
         # Step 4 : Intent Agent
         # =====================================================
-
         step_start = time.perf_counter()
 
         intent = await self.intent.analyze(knowledge)
@@ -142,7 +162,6 @@ class AssistantService:
         # =====================================================
         # Step 5 : Strategy Agent
         # =====================================================
-
         step_start = time.perf_counter()
 
         strategy = await self.strategy.generate(knowledge, persona, intent)
@@ -162,7 +181,6 @@ class AssistantService:
         # =====================================================
         # Step 6 : Guardrail Agent
         # =====================================================
-
         step_start = time.perf_counter()
 
         guardrail = await self.guardrail.verify(knowledge, persona, intent, strategy)
@@ -182,7 +200,6 @@ class AssistantService:
         # =====================================================
         # Execution Metrics
         # =====================================================
-
         total_time = round(
             (time.perf_counter() - start_time) * 1000,
             2,
@@ -190,14 +207,13 @@ class AssistantService:
 
         execution = {
             "total_time_ms": total_time,
-            "agents_executed": 5,
+            "agents_executed": 6,
             "knowledge_saved": True,
         }
 
         # =====================================================
         # Executive Summary
         # =====================================================
-
         overall_assessment = {
             "company": knowledge.get("company", ""),
             "decision_maker": (
@@ -226,7 +242,6 @@ class AssistantService:
         # =====================================================
         # Save Analysis
         # =====================================================
-
         analysis = self.analysis_service.save(
             db=db,
             user_id=current_user.id,
@@ -244,25 +259,16 @@ class AssistantService:
         # =====================================================
         # Final Response
         # =====================================================
-
         return {
             "analysis_id": analysis.id,
-
+            "research": research,
             "overall_assessment": overall_assessment,
-
             "knowledge_id": record.id,
-
             "knowledge": knowledge,
-
             "persona": persona,
-
             "intent": intent,
-
             "strategy": strategy,
-
             "guardrail": guardrail,
-
             "timeline": timeline,
-
             "execution": execution,
         }
