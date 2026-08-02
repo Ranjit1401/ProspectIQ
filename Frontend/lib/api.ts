@@ -18,3 +18,17 @@ export async function sendMessage(task: string) {
 
   return await response.json();
 }
+
+export async function getAnalysisHistory(token: string) {
+  const response = await fetch("http://localhost:8000/analysis/history", {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to load history");
+  }
+
+  return response.json();
+}

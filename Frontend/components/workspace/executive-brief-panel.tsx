@@ -2,13 +2,11 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowUpRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScoreRing } from "@/components/common/score-ring";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { accountsService } from "@/services/accounts.service";
-import type { Company } from "@/types";
+import { workspaceService } from "@/services/workspace.service";
 import type { OverallAssessment, KnowledgeData } from "@/services/workspace.service";
 
 interface ExecutiveBriefPanelProps {
@@ -33,7 +31,7 @@ export function ExecutiveBriefPanel({ assessment, knowledge }: ExecutiveBriefPan
     );
   }
 
-  const score = Math.round((assessment.intent_score ?? 0) * (assessment.intent_score <= 1 ? 100 : 1));
+  const score = Math.round((assessment.intent_score ?? 0) * ((assessment.intent_score ?? 0) <= 1 ? 100 : 1));
 
   return (
     <Card>
@@ -70,20 +68,19 @@ export function ExecutiveBriefPanel({ assessment, knowledge }: ExecutiveBriefPan
 }
 
 export function HistorySidebar() {
-  const [companies, setCompanies] = useState<Company[]>([]);
+  const [sessions, setSessions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
 
-    accountsService
-      .list()
+    workspaceService
+      .getAnalysisHistory()
       .then((data) => {
-        if (!cancelled) setCompanies(data);
+        if (!cancelled) setSessions(Array.isArray(data) ? data : []);
       })
       .catch(() => {
-        // Keep the sidebar empty rather than surfacing an error here —
-        // it's a secondary panel, not the primary action on this page.
+        // Keep sidebar resilient on API failure
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -103,27 +100,37 @@ export function HistorySidebar() {
         <div className="space-y-1 px-3">
           {loading && <p className="px-2 py-2 text-xs text-white/30">Loading…</p>}
 
-          {!loading && companies.length === 0 && (
+          {!loading && sessions.length === 0 && (
             <p className="px-2 py-2 text-xs text-white/30">
               Nothing analyzed yet — send a brief in the chat to start your first session.
             </p>
           )}
 
-          {companies.map((company) => (
-            <Link
-              key={company.id}
-              href={`/accounts/${company.id}`}
-              className="flex items-center justify-between rounded-lg px-2 py-2 text-xs text-white/45 hover:bg-white/[0.04] hover:text-white/80 transition-colors"
-            >
-              <span className="flex items-center gap-2">
-                <span className="flex h-6 w-6 items-center justify-center rounded-md bg-white/[0.06] text-[10px] text-white/60">
-                  {company.logoInitial}
+          {sessions.map((session, index) => {
+            const companyName = session?.overall_assessment?.company || "Unknown Company";
+            const initial = companyName.charAt(0).toUpperCase();
+            const intentScore = session?.overall_assessment?.intent_score ?? "N/A";
+            const analysisId = session?.analysis_id || `session-${index}`;
+
+            return (
+              <Link
+                key={analysisId}
+                href={`/analysis/${analysisId}`}
+                className="flex items-center justify-between rounded-lg px-2 py-2 text-xs text-white/45 transition-colors hover:bg-white/[0.04] hover:text-white/80"
+              >
+                <span className="flex items-center gap-2">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-md bg-white/[0.06] text-[10px] text-white/60">
+                    {initial}
+                  </span>
+                  <span>{companyName}</span>
                 </span>
-                {company.name}
-              </span>
-              <span className="text-[10px] text-white/25">{company.score}</span>
-            </Link>
-          ))}
+
+                <span className="text-[10px] text-white/25">
+                  {intentScore}
+                </span>
+              </Link>
+            );
+          })}
         </div>
       </ScrollArea>
     </Card>
