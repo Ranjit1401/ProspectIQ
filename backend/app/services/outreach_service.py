@@ -27,11 +27,15 @@ class OutreachService:
 
         next_action = strategy.get("next_best_action", "") or "Follow up"
 
-        subject = strategy.get("account_summary", "") or f"Following up: {next_action}"
+        subject = (
+            strategy.get("email_subject")
+            or strategy.get("account_summary", "")
+            or f"Following up: {next_action}"
+        )
         if len(subject) > 120:
             subject = subject[:117] + "..."
 
-        body = strategy.get("outreach_message") or strategy.get("talking_points") or next_action
+        body = strategy.get("email_body") or next_action
         if isinstance(body, list):
             body = "\n".join(str(item) for item in body)
         if not body:
