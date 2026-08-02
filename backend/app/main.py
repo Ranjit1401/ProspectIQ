@@ -1,8 +1,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
 from app.api.health import router as health_router
 from app.core.config import settings
 from app.core.logger import logger
+
 from app.api.llm import router as llm_router
 from app.api.tools import router as tool_router
 from app.api.agents import router as agent_router
@@ -26,25 +28,37 @@ from app.api.queue import router as queue_router
 from app.api.audit import router as audit_router
 
 
-
-
-
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
     description="ProspectIQ",
 )
 
+# =========================
+# CORS Configuration
+# =========================
+origins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+
+    # Vercel Frontend
+    "https://prospect-iq-oobr.vercel.app",
+
+    # Preview deployments
+    "https://prospect-iq-oobr-git-main-ranjit-bhardwaj-s-projects.vercel.app",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-    ],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# =========================
+# Routers
+# =========================
 
 app.include_router(health_router)
 app.include_router(llm_router)
