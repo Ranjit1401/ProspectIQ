@@ -129,6 +129,24 @@ export interface WorkspaceReportCompletion {
   approved?: boolean;
 }
 
+export interface Recommendation {
+  analysisId: string;
+  companyId: string;
+  company: string;
+  website: string;
+  industry: string;
+  score: number;
+  priority: string;
+  intent: number;
+  buyingStage: string;
+  riskLevel: string;
+  decisionMaker: string;
+  confidence: number;
+  nextAction: string;
+  reasons: string[];
+  createdAt: string;
+}
+
 export interface OutreachDraft {
   id: string;
   companyId: string;
@@ -189,6 +207,7 @@ export type NavKey =
   | "accounts"
   | "report"
   | "graph"
+  | "recommendations"
   | "queue"
   | "audit"
   | "profile";

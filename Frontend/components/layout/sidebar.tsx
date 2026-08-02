@@ -13,6 +13,7 @@ import {
   ChevronLeft,
   Command,
   Sparkles,
+  Lightbulb,
 } from "lucide-react";
 import { NAV_ITEMS, APP_NAME } from "@/lib/constants";
 import { cn } from "@/lib/utils";
@@ -22,6 +23,7 @@ const ICONS: Record<string, React.ElementType> = {
   workspace: Sparkles,
   accounts: Building2,
   graph: Share2,
+  recommendations: Lightbulb,
   queue: ListChecks,
   audit: ScrollText,
 };

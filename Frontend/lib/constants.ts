@@ -6,6 +6,7 @@ export const NAV_ITEMS: { id: NavKey; label: string; href: string }[] = [
   { id: "workspace", label: "AI Workspace", href: "/workspace" },
   { id: "accounts", label: "Accounts", href: "/accounts" },
   { id: "graph", label: "Relationship Graph", href: "/graph" },
+  { id: "recommendations", label: "Recommendation Center", href: "/recommendations" },
   { id: "queue", label: "Outreach Queue", href: "/queue" },
   { id: "audit", label: "Audit Trail", href: "/audit" },
 ];

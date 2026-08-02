@@ -607,21 +607,33 @@ async def company_dashboard(
 
 @router.get("/recommendations")
 async def recommendations(
+    company_id: int | None = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
 
-    analyses = (
-        db.query(AnalysisResult)
-        .filter(
-            AnalysisResult.user_id == current_user.id
-        )
-        .all()
+    query = db.query(AnalysisResult).filter(
+        AnalysisResult.user_id == current_user.id
     )
+
+    if company_id is not None:
+        query = query.filter(AnalysisResult.company_id == company_id)
+
+    analyses = query.order_by(AnalysisResult.created_at.asc()).all()
+
+    # One recommendation per company, built from that company's most
+    # recent analysis (analyses are sorted ascending above, so the last
+    # write per company_id in this loop is always the latest one) —
+    # mirrors the "current state of the account" convention used by
+    # company_dashboard() and workspace_stats() elsewhere in this file,
+    # instead of surfacing every historical analysis as a separate card.
+    latest_by_company: dict[int, AnalysisResult] = {}
+    for analysis in analyses:
+        latest_by_company[analysis.company_id] = analysis
 
     recommendations = []
 
-    for analysis in analyses:
+    for analysis in latest_by_company.values():
 
         company = analysis.company
 
@@ -666,19 +678,39 @@ async def recommendations(
 
         recommendations.append(
             {
+                "analysis_id": analysis.id,
                 "company_id": company.id,
                 "company": company.name,
+                "website": company.website,
+                "industry": company.industry,
                 "score": min(score, 100),
                 "priority": analysis.intent.get(
                     "priority",
                     "",
                 ),
                 "intent": intent,
+                "buying_stage": analysis.intent.get(
+                    "buying_stage",
+                    "",
+                ),
+                "risk_level": analysis.guardrail.get(
+                    "risk_level",
+                    "",
+                ),
+                "decision_maker": analysis.persona.get(
+                    "primary_decision_maker",
+                    "",
+                ),
+                "confidence": analysis.guardrail.get(
+                    "confidence",
+                    0,
+                ),
                 "next_action": analysis.strategy.get(
                     "next_best_action",
                     "",
                 ),
                 "reason": reasons,
+                "created_at": analysis.created_at,
             }
         )
 
