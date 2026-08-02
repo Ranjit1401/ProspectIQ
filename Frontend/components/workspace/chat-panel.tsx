@@ -6,7 +6,7 @@ import { Sparkles } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { PromptComposer, type ComposerAttachment, type WorkspaceMode } from "@/components/workspace/prompt-composer";
-import Loader from "@/components/workspace/loader";
+import { ResearchLoader } from "@/components/workspace/research-loader";
 import { StreamSteps } from "@/components/workspace/stream-steps";
 import { ReportReadyCard } from "@/components/workspace/report-ready-card";
 import type { ChatMessage } from "@/types";
@@ -70,56 +70,17 @@ export function ChatPanel({ messages, onSend, sending }: ChatPanelProps) {
                         </div>
                       )}
                     </div>
+                  ) : message.kind === "loading" ? (
+                    <ResearchLoader />
+                  ) : message.kind === "stream" ? (
+                    <StreamSteps steps={message.steps ?? []} chips={message.chips ?? []} />
+                  ) : message.kind === "report" ? (
+                    <div className="space-y-1">
+                      <p className="whitespace-pre-wrap text-white/75">{message.content}</p>
+                      {message.report && <ReportReadyCard report={message.report} />}
+                    </div>
                   ) : (
-                    // The assistant bubble crossfades between its stages —
-                    // loader -> live reasoning stream -> report — instead of
-                    // hard-swapping, so the research flow reads as one
-                    // continuous, seamless motion.
-                    <AnimatePresence mode="wait" initial={false}>
-                      {message.kind === "loading" ? (
-                        <motion.div
-                          key="loading"
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          exit={{ opacity: 0, scale: 0.97, transition: { duration: 0.3, ease: "easeInOut" } }}
-                          transition={{ duration: 0.35, ease: "easeInOut" }}
-                          className="flex items-center justify-center rounded-xl bg-white/[0.04] py-2"
-                        >
-                          <Loader />
-                        </motion.div>
-                      ) : message.kind === "stream" ? (
-                        <motion.div
-                          key="stream"
-                          initial={{ opacity: 0, y: 6 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, transition: { duration: 0.25 } }}
-                          transition={{ duration: 0.4, ease: "easeOut" }}
-                        >
-                          <StreamSteps steps={message.steps ?? []} chips={message.chips ?? []} />
-                        </motion.div>
-                      ) : message.kind === "report" ? (
-                        <motion.div
-                          key="report"
-                          initial={{ opacity: 0, y: 6 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ duration: 0.4, ease: "easeOut" }}
-                          className="space-y-1"
-                        >
-                          <p className="whitespace-pre-wrap text-white/75">{message.content}</p>
-                          {message.report && <ReportReadyCard report={message.report} />}
-                        </motion.div>
-                      ) : (
-                        <motion.p
-                          key="text"
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          transition={{ duration: 0.3 }}
-                          className="whitespace-pre-wrap"
-                        >
-                          {message.content}
-                        </motion.p>
-                      )}
-                    </AnimatePresence>
+                    <p className="whitespace-pre-wrap">{message.content}</p>
                   )}
                 </div>
               </motion.div>

@@ -35,9 +35,9 @@ export function HeroSection() {
           transition={{ duration: 0.7, delay: 0.1 }}
           className="text-4xl font-semibold tracking-tight text-white sm:text-6xl"
         >
-          AI Decision Intelligence
+          The future of enterprise
           <br />
-          <span className="text-gradient-silver">for Enterprise Sales Teams</span>
+          <span className="text-gradient-silver">AI decision intelligence.</span>
         </motion.h1>
 
         <motion.p
@@ -46,7 +46,9 @@ export function HeroSection() {
           transition={{ duration: 0.7, delay: 0.2 }}
           className="mt-6 max-w-xl text-balance text-base leading-relaxed text-white/50 sm:text-lg"
         >
-          Research.  Reason.  Recommend.  Execute.
+          ProspectIQ orchestrates research, stakeholder mapping, and outreach strategy
+          across explainable AI agents — every claim grounded, every risky output
+          caught by a guardrail, every send approved by a human.
         </motion.p>
 
         <motion.div
@@ -57,13 +59,13 @@ export function HeroSection() {
         >
           <Link href="/login">
             <Button size="lg" className="group">
-              Start Intelligence
+              Enter Workspace
               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
             </Button>
           </Link>
           <a href="#pipeline">
             <Button size="lg" variant="outline">
-              Watch Demo
+              See how it reasons
             </Button>
           </a>
         </motion.div>
