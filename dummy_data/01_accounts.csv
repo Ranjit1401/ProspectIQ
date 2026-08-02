@@ -1,0 +1,21 @@
+account_id,company,industry,website,employees,stage,status,trust_score
+ACC001,Tavily AI,AI Search,https://tavilyai.com,4336,Series A,Active,87
+ACC002,n8n,Workflow Automation,https://n8n.com,620,Growth,Active,85
+ACC003,Navan,TravelTech,https://navan.com,157,Enterprise,Active,96
+ACC004,Featherless AI,AI Infrastructure,https://featherlessai.com,1066,Seed,Active,97
+ACC005,LedgerPe,FinTech,https://ledgerpe.com,1107,Series B,Active,97
+ACC006,concierge.ai,Enterprise AI,https://conciergeai.com,1686,Series A,Active,95
+ACC007,Resourcio,SaaS,https://resourcio.com,2418,Seed,Active,93
+ACC008,Bindu,SaaS,https://bindu.com,4613,Seed,Active,94
+ACC009,TechTribe,Developer Platform,https://techtribe.com,4733,Growth,Active,98
+ACC010,EventDevX,EventTech,https://eventdevx.com,4946,Series A,Active,92
+ACC011,Hackfinity,Developer Platform,https://hackfinity.com,383,Seed,Active,97
+ACC012,TRECC,Startup Ecosystem,https://trecc.com,3284,Growth,Active,93
+ACC013,LangChain,AI Framework,https://langchain.com,3646,Growth,Active,93
+ACC014,Pinecone,Vector DB,https://pinecone.com,3370,Series B,Active,88
+ACC015,Supabase,Backend,https://supabase.com,610,Growth,Active,87
+ACC016,Vercel,Developer,https://vercel.com,2405,Growth,Active,85
+ACC017,Groq,AI Hardware,https://groq.com,1597,Series C,Active,98
+ACC018,Anthropic,Foundation Models,https://anthropic.com,1402,Enterprise,Active,87
+ACC019,Perplexity,AI Search,https://perplexity.com,4837,Series C,Active,87
+ACC020,Cohere,Enterprise AI,https://cohere.com,2356,Series C,Active,98

@@ -10,10 +10,10 @@ const CHIP_BY_KIND: Record<ComposerAttachment["kind"], string> = {
   csv: "CSV",
   url: "Website",
   crm: "CRM",
-  gmail: "Emails",
-  drive: "Drive",
-  notion: "Notion",
-  calendar: "Calendar",
+  image: "Image",
+  notes: "Notes",
+  audio: "Audio",
+  video: "Video",
 };
 
 function attachmentStep(a: ComposerAttachment): ScriptedStep {
@@ -26,14 +26,14 @@ function attachmentStep(a: ComposerAttachment): ScriptedStep {
       return { label: `Reading ${a.label}...`, chip: CHIP_BY_KIND.url };
     case "crm":
       return { label: "Connecting CRM...", chip: CHIP_BY_KIND.crm };
-    case "gmail":
-      return { label: "Reading recent emails...", chip: CHIP_BY_KIND.gmail };
-    case "drive":
-      return { label: "Scanning Google Drive...", chip: CHIP_BY_KIND.drive };
-    case "notion":
-      return { label: "Reading Notion workspace...", chip: CHIP_BY_KIND.notion };
-    case "calendar":
-      return { label: "Checking meeting notes...", chip: CHIP_BY_KIND.calendar };
+    case "image":
+      return { label: `Analyzing ${a.label}...`, chip: CHIP_BY_KIND.image };
+    case "notes":
+      return { label: `Reading ${a.label}...`, chip: CHIP_BY_KIND.notes };
+    case "audio":
+      return { label: `Transcribing ${a.label}...`, chip: CHIP_BY_KIND.audio };
+    case "video":
+      return { label: `Processing ${a.label}...`, chip: CHIP_BY_KIND.video };
   }
 }
 

@@ -1,0 +1,81 @@
+contact_id,account_id,name,role,email,influence
+ACC001-CEO,ACC001,CEO Tavily AI,CEO,ceo@example.com,97
+ACC001-CTO,ACC001,CTO Tavily AI,CTO,cto@example.com,77
+ACC001-VP Engineering,ACC001,VP Engineering Tavily AI,VP Engineering,vp@example.com,71
+ACC001-Head Sales,ACC001,Head Sales Tavily AI,Head Sales,head@example.com,93
+ACC002-CEO,ACC002,CEO n8n,CEO,ceo@example.com,87
+ACC002-CTO,ACC002,CTO n8n,CTO,cto@example.com,92
+ACC002-VP Engineering,ACC002,VP Engineering n8n,VP Engineering,vp@example.com,96
+ACC002-Head Sales,ACC002,Head Sales n8n,Head Sales,head@example.com,93
+ACC003-CEO,ACC003,CEO Navan,CEO,ceo@example.com,88
+ACC003-CTO,ACC003,CTO Navan,CTO,cto@example.com,88
+ACC003-VP Engineering,ACC003,VP Engineering Navan,VP Engineering,vp@example.com,88
+ACC003-Head Sales,ACC003,Head Sales Navan,Head Sales,head@example.com,98
+ACC004-CEO,ACC004,CEO Featherless AI,CEO,ceo@example.com,94
+ACC004-CTO,ACC004,CTO Featherless AI,CTO,cto@example.com,96
+ACC004-VP Engineering,ACC004,VP Engineering Featherless AI,VP Engineering,vp@example.com,70
+ACC004-Head Sales,ACC004,Head Sales Featherless AI,Head Sales,head@example.com,87
+ACC005-CEO,ACC005,CEO LedgerPe,CEO,ceo@example.com,80
+ACC005-CTO,ACC005,CTO LedgerPe,CTO,cto@example.com,86
+ACC005-VP Engineering,ACC005,VP Engineering LedgerPe,VP Engineering,vp@example.com,92
+ACC005-Head Sales,ACC005,Head Sales LedgerPe,Head Sales,head@example.com,97
+ACC006-CEO,ACC006,CEO concierge.ai,CEO,ceo@example.com,71
+ACC006-CTO,ACC006,CTO concierge.ai,CTO,cto@example.com,70
+ACC006-VP Engineering,ACC006,VP Engineering concierge.ai,VP Engineering,vp@example.com,82
+ACC006-Head Sales,ACC006,Head Sales concierge.ai,Head Sales,head@example.com,84
+ACC007-CEO,ACC007,CEO Resourcio,CEO,ceo@example.com,88
+ACC007-CTO,ACC007,CTO Resourcio,CTO,cto@example.com,98
+ACC007-VP Engineering,ACC007,VP Engineering Resourcio,VP Engineering,vp@example.com,72
+ACC007-Head Sales,ACC007,Head Sales Resourcio,Head Sales,head@example.com,96
+ACC008-CEO,ACC008,CEO Bindu,CEO,ceo@example.com,100
+ACC008-CTO,ACC008,CTO Bindu,CTO,cto@example.com,84
+ACC008-VP Engineering,ACC008,VP Engineering Bindu,VP Engineering,vp@example.com,76
+ACC008-Head Sales,ACC008,Head Sales Bindu,Head Sales,head@example.com,83
+ACC009-CEO,ACC009,CEO TechTribe,CEO,ceo@example.com,91
+ACC009-CTO,ACC009,CTO TechTribe,CTO,cto@example.com,94
+ACC009-VP Engineering,ACC009,VP Engineering TechTribe,VP Engineering,vp@example.com,74
+ACC009-Head Sales,ACC009,Head Sales TechTribe,Head Sales,head@example.com,98
+ACC010-CEO,ACC010,CEO EventDevX,CEO,ceo@example.com,99
+ACC010-CTO,ACC010,CTO EventDevX,CTO,cto@example.com,78
+ACC010-VP Engineering,ACC010,VP Engineering EventDevX,VP Engineering,vp@example.com,70
+ACC010-Head Sales,ACC010,Head Sales EventDevX,Head Sales,head@example.com,72
+ACC011-CEO,ACC011,CEO Hackfinity,CEO,ceo@example.com,85
+ACC011-CTO,ACC011,CTO Hackfinity,CTO,cto@example.com,84
+ACC011-VP Engineering,ACC011,VP Engineering Hackfinity,VP Engineering,vp@example.com,88
+ACC011-Head Sales,ACC011,Head Sales Hackfinity,Head Sales,head@example.com,94
+ACC012-CEO,ACC012,CEO TRECC,CEO,ceo@example.com,72
+ACC012-CTO,ACC012,CTO TRECC,CTO,cto@example.com,95
+ACC012-VP Engineering,ACC012,VP Engineering TRECC,VP Engineering,vp@example.com,83
+ACC012-Head Sales,ACC012,Head Sales TRECC,Head Sales,head@example.com,98
+ACC013-CEO,ACC013,CEO LangChain,CEO,ceo@example.com,93
+ACC013-CTO,ACC013,CTO LangChain,CTO,cto@example.com,74
+ACC013-VP Engineering,ACC013,VP Engineering LangChain,VP Engineering,vp@example.com,98
+ACC013-Head Sales,ACC013,Head Sales LangChain,Head Sales,head@example.com,90
+ACC014-CEO,ACC014,CEO Pinecone,CEO,ceo@example.com,74
+ACC014-CTO,ACC014,CTO Pinecone,CTO,cto@example.com,86
+ACC014-VP Engineering,ACC014,VP Engineering Pinecone,VP Engineering,vp@example.com,74
+ACC014-Head Sales,ACC014,Head Sales Pinecone,Head Sales,head@example.com,99
+ACC015-CEO,ACC015,CEO Supabase,CEO,ceo@example.com,77
+ACC015-CTO,ACC015,CTO Supabase,CTO,cto@example.com,74
+ACC015-VP Engineering,ACC015,VP Engineering Supabase,VP Engineering,vp@example.com,90
+ACC015-Head Sales,ACC015,Head Sales Supabase,Head Sales,head@example.com,94
+ACC016-CEO,ACC016,CEO Vercel,CEO,ceo@example.com,83
+ACC016-CTO,ACC016,CTO Vercel,CTO,cto@example.com,86
+ACC016-VP Engineering,ACC016,VP Engineering Vercel,VP Engineering,vp@example.com,98
+ACC016-Head Sales,ACC016,Head Sales Vercel,Head Sales,head@example.com,71
+ACC017-CEO,ACC017,CEO Groq,CEO,ceo@example.com,74
+ACC017-CTO,ACC017,CTO Groq,CTO,cto@example.com,86
+ACC017-VP Engineering,ACC017,VP Engineering Groq,VP Engineering,vp@example.com,88
+ACC017-Head Sales,ACC017,Head Sales Groq,Head Sales,head@example.com,94
+ACC018-CEO,ACC018,CEO Anthropic,CEO,ceo@example.com,86
+ACC018-CTO,ACC018,CTO Anthropic,CTO,cto@example.com,72
+ACC018-VP Engineering,ACC018,VP Engineering Anthropic,VP Engineering,vp@example.com,75
+ACC018-Head Sales,ACC018,Head Sales Anthropic,Head Sales,head@example.com,94
+ACC019-CEO,ACC019,CEO Perplexity,CEO,ceo@example.com,90
+ACC019-CTO,ACC019,CTO Perplexity,CTO,cto@example.com,82
+ACC019-VP Engineering,ACC019,VP Engineering Perplexity,VP Engineering,vp@example.com,99
+ACC019-Head Sales,ACC019,Head Sales Perplexity,Head Sales,head@example.com,87
+ACC020-CEO,ACC020,CEO Cohere,CEO,ceo@example.com,71
+ACC020-CTO,ACC020,CTO Cohere,CTO,cto@example.com,93
+ACC020-VP Engineering,ACC020,VP Engineering Cohere,VP Engineering,vp@example.com,99
+ACC020-Head Sales,ACC020,Head Sales Cohere,Head Sales,head@example.com,91

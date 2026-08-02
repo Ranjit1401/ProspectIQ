@@ -1,0 +1,222 @@
+[
+  {
+    "account_id": "ACC001",
+    "company": "Tavily AI",
+    "trust_score": 95,
+    "confidence": 94,
+    "strategy": "Target CTO",
+    "pain_points": [
+      "Scalability",
+      "Security"
+    ]
+  },
+  {
+    "account_id": "ACC002",
+    "company": "n8n",
+    "trust_score": 95,
+    "confidence": 94,
+    "strategy": "Target CTO",
+    "pain_points": [
+      "Scalability",
+      "Security"
+    ]
+  },
+  {
+    "account_id": "ACC003",
+    "company": "Navan",
+    "trust_score": 95,
+    "confidence": 94,
+    "strategy": "Target CTO",
+    "pain_points": [
+      "Scalability",
+      "Security"
+    ]
+  },
+  {
+    "account_id": "ACC004",
+    "company": "Featherless AI",
+    "trust_score": 95,
+    "confidence": 94,
+    "strategy": "Target CTO",
+    "pain_points": [
+      "Scalability",
+      "Security"
+    ]
+  },
+  {
+    "account_id": "ACC005",
+    "company": "LedgerPe",
+    "trust_score": 95,
+    "confidence": 94,
+    "strategy": "Target CTO",
+    "pain_points": [
+      "Scalability",
+      "Security"
+    ]
+  },
+  {
+    "account_id": "ACC006",
+    "company": "concierge.ai",
+    "trust_score": 95,
+    "confidence": 94,
+    "strategy": "Target CTO",
+    "pain_points": [
+      "Scalability",
+      "Security"
+    ]
+  },
+  {
+    "account_id": "ACC007",
+    "company": "Resourcio",
+    "trust_score": 95,
+    "confidence": 94,
+    "strategy": "Target CTO",
+    "pain_points": [
+      "Scalability",
+      "Security"
+    ]
+  },
+  {
+    "account_id": "ACC008",
+    "company": "Bindu",
+    "trust_score": 95,
+    "confidence": 94,
+    "strategy": "Target CTO",
+    "pain_points": [
+      "Scalability",
+      "Security"
+    ]
+  },
+  {
+    "account_id": "ACC009",
+    "company": "TechTribe",
+    "trust_score": 95,
+    "confidence": 94,
+    "strategy": "Target CTO",
+    "pain_points": [
+      "Scalability",
+      "Security"
+    ]
+  },
+  {
+    "account_id": "ACC010",
+    "company": "EventDevX",
+    "trust_score": 95,
+    "confidence": 94,
+    "strategy": "Target CTO",
+    "pain_points": [
+      "Scalability",
+      "Security"
+    ]
+  },
+  {
+    "account_id": "ACC011",
+    "company": "Hackfinity",
+    "trust_score": 95,
+    "confidence": 94,
+    "strategy": "Target CTO",
+    "pain_points": [
+      "Scalability",
+      "Security"
+    ]
+  },
+  {
+    "account_id": "ACC012",
+    "company": "TRECC",
+    "trust_score": 95,
+    "confidence": 94,
+    "strategy": "Target CTO",
+    "pain_points": [
+      "Scalability",
+      "Security"
+    ]
+  },
+  {
+    "account_id": "ACC013",
+    "company": "LangChain",
+    "trust_score": 95,
+    "confidence": 94,
+    "strategy": "Target CTO",
+    "pain_points": [
+      "Scalability",
+      "Security"
+    ]
+  },
+  {
+    "account_id": "ACC014",
+    "company": "Pinecone",
+    "trust_score": 95,
+    "confidence": 94,
+    "strategy": "Target CTO",
+    "pain_points": [
+      "Scalability",
+      "Security"
+    ]
+  },
+  {
+    "account_id": "ACC015",
+    "company": "Supabase",
+    "trust_score": 95,
+    "confidence": 94,
+    "strategy": "Target CTO",
+    "pain_points": [
+      "Scalability",
+      "Security"
+    ]
+  },
+  {
+    "account_id": "ACC016",
+    "company": "Vercel",
+    "trust_score": 95,
+    "confidence": 94,
+    "strategy": "Target CTO",
+    "pain_points": [
+      "Scalability",
+      "Security"
+    ]
+  },
+  {
+    "account_id": "ACC017",
+    "company": "Groq",
+    "trust_score": 95,
+    "confidence": 94,
+    "strategy": "Target CTO",
+    "pain_points": [
+      "Scalability",
+      "Security"
+    ]
+  },
+  {
+    "account_id": "ACC018",
+    "company": "Anthropic",
+    "trust_score": 95,
+    "confidence": 94,
+    "strategy": "Target CTO",
+    "pain_points": [
+      "Scalability",
+      "Security"
+    ]
+  },
+  {
+    "account_id": "ACC019",
+    "company": "Perplexity",
+    "trust_score": 95,
+    "confidence": 94,
+    "strategy": "Target CTO",
+    "pain_points": [
+      "Scalability",
+      "Security"
+    ]
+  },
+  {
+    "account_id": "ACC020",
+    "company": "Cohere",
+    "trust_score": 95,
+    "confidence": 94,
+    "strategy": "Target CTO",
+    "pain_points": [
+      "Scalability",
+      "Security"
+    ]
+  }
+]

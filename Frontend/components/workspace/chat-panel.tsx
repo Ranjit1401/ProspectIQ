@@ -2,15 +2,11 @@
 
 import { useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-<<<<<<< HEAD
 import { Sparkles } from "lucide-react";
-=======
-import { Send, Sparkles, Loader2 } from "lucide-react";
->>>>>>> eb4a03798b9e26785d9c9831085d17640cba910d
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { PromptComposer, type ComposerAttachment, type WorkspaceMode } from "@/components/workspace/prompt-composer";
-import { ResearchLoader } from "@/components/workspace/research-loader";
+import Loader from "@/components/workspace/loader";
 import { StreamSteps } from "@/components/workspace/stream-steps";
 import { ReportReadyCard } from "@/components/workspace/report-ready-card";
 import type { ChatMessage } from "@/types";
@@ -18,7 +14,6 @@ import { cn } from "@/lib/utils";
 
 interface ChatPanelProps {
   messages: ChatMessage[];
-<<<<<<< HEAD
   onSend: (text: string, meta: { mode: WorkspaceMode; attachments: ComposerAttachment[] }) => void | Promise<void>;
   sending?: boolean;
 }
@@ -29,21 +24,6 @@ export function ChatPanel({ messages, onSend, sending }: ChatPanelProps) {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages]);
-=======
-  onSend: (text: string) => void | Promise<void>;
-  sending?: boolean;
-}
-
-export function ChatPanel({ messages, onSend, sending }: ChatPanelProps) {
-  const [draft, setDraft] = useState("");
-
-  function handleSend() {
-    if (!draft.trim() || sending) return;
-    const text = draft;
-    setDraft("");
-    void onSend(text);
-  }
->>>>>>> eb4a03798b9e26785d9c9831085d17640cba910d
 
   return (
     <div className="flex h-full flex-col rounded-2xl border border-white/8 bg-[#111111]">
@@ -68,11 +48,7 @@ export function ChatPanel({ messages, onSend, sending }: ChatPanelProps) {
 
                 <div
                   className={cn(
-<<<<<<< HEAD
                     "max-w-[82%] rounded-2xl px-3.5 py-2.5 text-[13px] leading-relaxed",
-=======
-                    "max-w-[80%] whitespace-pre-wrap rounded-2xl px-3.5 py-2.5 text-[13px] leading-relaxed",
->>>>>>> eb4a03798b9e26785d9c9831085d17640cba910d
                     message.role === "user"
                       ? "bg-white/[0.08] text-white/90"
                       : "border border-white/6 bg-white/[0.03] text-white/70",
@@ -94,57 +70,66 @@ export function ChatPanel({ messages, onSend, sending }: ChatPanelProps) {
                         </div>
                       )}
                     </div>
-                  ) : message.kind === "loading" ? (
-                    <ResearchLoader />
-                  ) : message.kind === "stream" ? (
-                    <StreamSteps steps={message.steps ?? []} chips={message.chips ?? []} />
-                  ) : message.kind === "report" ? (
-                    <div className="space-y-1">
-                      <p className="whitespace-pre-wrap text-white/75">{message.content}</p>
-                      {message.report && <ReportReadyCard report={message.report} />}
-                    </div>
                   ) : (
-                    <p className="whitespace-pre-wrap">{message.content}</p>
+                    // The assistant bubble crossfades between its stages —
+                    // loader -> live reasoning stream -> report — instead of
+                    // hard-swapping, so the research flow reads as one
+                    // continuous, seamless motion.
+                    <AnimatePresence mode="wait" initial={false}>
+                      {message.kind === "loading" ? (
+                        <motion.div
+                          key="loading"
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0, scale: 0.97, transition: { duration: 0.3, ease: "easeInOut" } }}
+                          transition={{ duration: 0.35, ease: "easeInOut" }}
+                          className="flex items-center justify-center rounded-xl bg-white/[0.04] py-2"
+                        >
+                          <Loader />
+                        </motion.div>
+                      ) : message.kind === "stream" ? (
+                        <motion.div
+                          key="stream"
+                          initial={{ opacity: 0, y: 6 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, transition: { duration: 0.25 } }}
+                          transition={{ duration: 0.4, ease: "easeOut" }}
+                        >
+                          <StreamSteps steps={message.steps ?? []} chips={message.chips ?? []} />
+                        </motion.div>
+                      ) : message.kind === "report" ? (
+                        <motion.div
+                          key="report"
+                          initial={{ opacity: 0, y: 6 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.4, ease: "easeOut" }}
+                          className="space-y-1"
+                        >
+                          <p className="whitespace-pre-wrap text-white/75">{message.content}</p>
+                          {message.report && <ReportReadyCard report={message.report} />}
+                        </motion.div>
+                      ) : (
+                        <motion.p
+                          key="text"
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          transition={{ duration: 0.3 }}
+                          className="whitespace-pre-wrap"
+                        >
+                          {message.content}
+                        </motion.p>
+                      )}
+                    </AnimatePresence>
                   )}
                 </div>
               </motion.div>
             ))}
           </AnimatePresence>
-<<<<<<< HEAD
           <div ref={bottomRef} />
         </div>
       </ScrollArea>
 
       <PromptComposer onSend={onSend} sending={sending} />
-=======
-
-          {sending && (
-            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex gap-3">
-              <Avatar className="h-7 w-7 shrink-0">
-                <AvatarFallback>IQ</AvatarFallback>
-              </Avatar>
-              <div className="flex items-center gap-2 rounded-2xl border border-white/6 bg-white/[0.03] px-3.5 py-2.5 text-[13px] text-white/45">
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                Running the agent pipeline…
-              </div>
-            </motion.div>
-          )}
-        </div>
-      </ScrollArea>
-
-      <div className="flex items-center gap-2 border-t border-white/6 p-3">
-        <Input
-          placeholder="Paste a company brief, notes, or a website summary to research..."
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && handleSend()}
-          disabled={sending}
-        />
-        <Button size="icon" onClick={handleSend} aria-label="Send message" disabled={sending}>
-          {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-        </Button>
-      </div>
->>>>>>> eb4a03798b9e26785d9c9831085d17640cba910d
     </div>
   );
 }
