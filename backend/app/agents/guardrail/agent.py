@@ -1,9 +1,6 @@
 import json
 
 from app.agents.guardrail.prompt import GUARDRAIL_PROMPT
-from app.agents.intent.agent import IntentAgent
-from app.agents.persona.agent import PersonaAgent
-from app.agents.strategy.agent import StrategyAgent
 from app.core.context import context
 from app.utils.llm_json import LLMJsonParser
 
@@ -13,13 +10,10 @@ class GuardrailAgent:
     async def verify(
         self,
         knowledge: dict,
+        persona: dict,
+        intent: dict,
+        strategy: dict,
     ):
-
-        persona = await PersonaAgent().analyze(knowledge)
-
-        intent = await IntentAgent().analyze(knowledge)
-
-        strategy = await StrategyAgent().generate(knowledge)
 
         prompt = f"""
 {GUARDRAIL_PROMPT}
@@ -44,7 +38,6 @@ Strategy:
         response = await context.llm.generate(prompt)
 
         try:
-
             return LLMJsonParser.parse(response)
 
         except Exception as e:

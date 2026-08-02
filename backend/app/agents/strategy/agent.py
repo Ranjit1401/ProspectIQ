@@ -1,7 +1,5 @@
 import json
 
-from app.agents.intent.agent import IntentAgent
-from app.agents.persona.agent import PersonaAgent
 from app.agents.strategy.prompt import STRATEGY_PROMPT
 from app.core.context import context
 from app.utils.llm_json import LLMJsonParser
@@ -12,11 +10,9 @@ class StrategyAgent:
     async def generate(
         self,
         knowledge: dict,
+        persona: dict,
+        intent: dict,
     ):
-
-        persona = await PersonaAgent().analyze(knowledge)
-
-        intent = await IntentAgent().analyze(knowledge)
 
         prompt = f"""
 {STRATEGY_PROMPT}
@@ -37,7 +33,6 @@ Intent:
         response = await context.llm.generate(prompt)
 
         try:
-
             return LLMJsonParser.parse(response)
 
         except Exception as e:

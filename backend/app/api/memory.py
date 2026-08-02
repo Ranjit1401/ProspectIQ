@@ -14,14 +14,14 @@ router = APIRouter(
 async def get_memory(
     current_user: User = Depends(get_current_user),
 ):
-    return context.memory.get_history()
+    return context.memory.get_history(current_user.id)
 
 
 @router.delete("/")
 async def clear_memory(
     current_user: User = Depends(get_current_user),
 ):
-    context.memory.clear()
+    context.memory.clear(current_user.id)
 
     return {
         "message": "Memory cleared."

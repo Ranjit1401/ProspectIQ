@@ -6,4 +6,6 @@ engine = create_engine(
     settings.DATABASE_URL,
     echo=True,
     future=True,
+    pool_pre_ping=True,
+    pool_recycle=300,
 )

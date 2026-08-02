@@ -24,8 +24,10 @@ class BaseAgent(ABC):
     async def run(
         self,
         task: str,
+        **kwargs,
     ):
         """
-        Execute the agent.
+        Execute the agent. Implementations may accept extra keyword
+        arguments (e.g. current_user, db) that only some agents need.
         """
         pass

@@ -14,7 +14,7 @@ class ResearchAgent(BaseAgent):
         super().__init__(llm, tools)
         self.decision = DecisionEngine(self.llm)
 
-    async def run(self, task: str):
+    async def run(self, task: str, **kwargs):
         """
         Execute the research agent.
         """
@@ -60,3 +60,13 @@ class ResearchAgent(BaseAgent):
                 "tool_used": tool,
                 "response": tool_result,
             }
+
+        # No tool was needed — answer directly instead of falling through
+        # and returning None (which previously crashed the Supervisor).
+        llm_response = await self.llm.generate(task)
+
+        return {
+            "agent": self.name,
+            "tool_used": None,
+            "response": llm_response,
+        }

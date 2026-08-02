@@ -1,4 +1,5 @@
 from app.agents.research_agent import ResearchAgent
+from app.agents.sales_analysis_agent import SalesAnalysisAgent
 from app.llm.gemini_provider import GeminiProvider
 from app.llm.groq_provider import GroqProvider
 from app.llm.manager import LLMManager
@@ -10,6 +11,8 @@ from app.tools.registry import ToolRegistry
 from app.memory.memory import Memory
 from app.tools.weather import WeatherTool
 from app.tools.search import SearchTool
+from app.tools.news import NewsTool
+from app.tools.website_tool import WebsiteTool
 
 class AppContext:
     """
@@ -71,6 +74,13 @@ class AppContext:
 
         self.agent_registry.register(
             ResearchAgent(
+                self.llm,
+                self.tool_registry,
+            )
+        )
+
+        self.agent_registry.register(
+            SalesAnalysisAgent(
                 self.llm,
                 self.tool_registry,
             )

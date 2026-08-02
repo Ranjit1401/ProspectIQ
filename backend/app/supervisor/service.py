@@ -9,5 +9,7 @@ class SupervisorService:
     async def execute(
         self,
         task: str,
+        current_user,
+        db,
     ):
-        return await self.supervisor.execute(task)
+        return await self.supervisor.execute(task, current_user, db)
