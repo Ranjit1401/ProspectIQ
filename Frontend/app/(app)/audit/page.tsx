@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { AuditTimeline } from "@/components/audit/audit-timeline";
 import { workspaceService } from "@/services/workspace.service";
 
@@ -8,17 +8,45 @@ export default function AuditPage() {
   const [events, setEvents] = useState<any[]>([]);
   const [analysis, setAnalysis] = useState<any>(null);
   const [history, setHistory] = useState<any[]>([]);
-  const [selectedId, setSelectedId] = useState<number>(39);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
   const [open, setOpen] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  // Load the user's analysis history first, then default to the most
+  // recent analysis instead of a hardcoded id that may not exist (or
+  // may belong to a different user, since GET /analysis/{id} scopes by
+  // current_user.id and returns a plain { error: "..." } body for a miss).
+  useEffect(() => {
+    workspaceService.getAnalysisHistory().then((data) => {
+      setHistory(data);
+      if (data.length > 0 && selectedId === null) {
+        setSelectedId(data[0].analysis_id);
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
-    async function load() {
-      try {
-        const response = await workspaceService.getAnalysis(selectedId);
-        setAnalysis(response);
-        console.log(response);
+    if (selectedId === null) return;
 
-        const mapped = response.timeline.map((item: any, index: number) => ({
+    async function load() {
+      setLoadError(null);
+
+      try {
+        const response = await workspaceService.getAnalysis(selectedId as number);
+
+        if (!response || "error" in response) {
+          setAnalysis(null);
+          setEvents([]);
+          setLoadError((response as any)?.error || "Analysis not found.");
+          return;
+        }
+
+        setAnalysis(response);
+
+        const timeline = Array.isArray(response.timeline) ? response.timeline : [];
+
+        const mapped = timeline.map((item: any, index: number) => ({
           id: String(index + 1),
           event: item.agent,
           agent: item.agent,
@@ -28,26 +56,23 @@ export default function AuditPage() {
               : item.status === "saved"
               ? "success"
               : "info",
-          detail: `${item.agent} finished in ${(item.duration_ms / 1000).toFixed(
+          detail: `${item.agent} finished in ${((item.duration_ms ?? 0) / 1000).toFixed(
             2
           )} sec`,
-          time: `${(item.duration_ms / 1000).toFixed(1)} s`,
+          time: `${((item.duration_ms ?? 0) / 1000).toFixed(1)} s`,
         }));
 
         setEvents(mapped);
       } catch (e) {
         console.error(e);
+        setAnalysis(null);
+        setEvents([]);
+        setLoadError("Could not reach the backend. Make sure the FastAPI server is running.");
       }
     }
 
     load();
   }, [selectedId]);
-
-  useEffect(() => {
-    workspaceService.getAnalysisHistory().then((data) => {
-      setHistory(data);
-    });
-  }, []);
 
   return (
     <div className="max-w-3xl space-y-5">
@@ -61,6 +86,18 @@ export default function AuditPage() {
             Enterprise execution trace for every AI agent.
           </p>
         </div>
+
+        {loadError && (
+          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 text-sm text-white/50">
+            {loadError}
+          </div>
+        )}
+
+        {!loadError && history.length === 0 && (
+          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 text-sm text-white/50">
+            No analyses yet — run one from the AI Workspace and it'll show up here.
+          </div>
+        )}
 
         {analysis && (
           <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
@@ -179,10 +216,7 @@ export default function AuditPage() {
         )}
       </div>
 
-      <AuditTimeline
-        events={events}
-        analysis={analysis}
-      />
+      {analysis && <AuditTimeline events={events} analysis={analysis} />}
     </div>
   );
 }

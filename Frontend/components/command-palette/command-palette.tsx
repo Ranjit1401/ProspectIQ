@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Building2,
@@ -22,7 +23,8 @@ import {
   CommandSeparator,
   CommandShortcut,
 } from "@/components/ui/command";
-import { MOCK_COMPANIES } from "@/lib/mock-data";
+import { accountsService } from "@/services/accounts.service";
+import type { Company } from "@/types";
 
 interface CommandPaletteProps {
   open: boolean;
@@ -31,20 +33,56 @@ interface CommandPaletteProps {
 
 export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   const router = useRouter();
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  // Load real accounts (backed by GET /workspace/) the moment the
+  // palette opens, rather than on every keystroke — this is a small
+  // list per user, so one fetch per open is enough.
+  useEffect(() => {
+    if (!open) return;
+
+    let cancelled = false;
+    setLoading(true);
+
+    accountsService
+      .list()
+      .then((data) => {
+        if (!cancelled) setCompanies(data);
+      })
+      .catch(() => {
+        if (!cancelled) setCompanies([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
 
   const go = (href: string) => {
     router.push(href);
     onOpenChange(false);
   };
 
+  const recentAnalyzed = companies.filter((c) => c.status === "analyzed").slice(0, 3);
+
   return (
     <CommandDialog open={open} onOpenChange={onOpenChange}>
       <CommandInput placeholder="Search a company, jump to a page, or run a command..." />
       <CommandList>
-        <CommandEmpty>No results found.</CommandEmpty>
+        <CommandEmpty>{loading ? "Loading accounts…" : "No results found."}</CommandEmpty>
 
         <CommandGroup heading="Search Company">
-          {MOCK_COMPANIES.slice(0, 5).map((company) => (
+          {companies.length === 0 && !loading && (
+            <CommandItem disabled onSelect={() => {}}>
+              <Building2 className="h-4 w-4 text-white/40" />
+              <span>No companies analyzed yet</span>
+            </CommandItem>
+          )}
+          {companies.slice(0, 5).map((company) => (
             <CommandItem key={company.id} onSelect={() => go(`/accounts/${company.id}`)}>
               <Building2 className="h-4 w-4 text-white/40" />
               <span>{company.name}</span>
@@ -56,14 +94,18 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
         <CommandSeparator />
 
         <CommandGroup heading="Recent Accounts">
-          {MOCK_COMPANIES.filter((c) => c.status === "analyzed")
-            .slice(0, 3)
-            .map((company) => (
-              <CommandItem key={`recent-${company.id}`} onSelect={() => go(`/accounts/${company.id}`)}>
-                <FileSearch className="h-4 w-4 text-white/40" />
-                <span>{company.name} — Executive Report</span>
-              </CommandItem>
-            ))}
+          {recentAnalyzed.length === 0 && !loading && (
+            <CommandItem disabled onSelect={() => {}}>
+              <FileSearch className="h-4 w-4 text-white/40" />
+              <span>Nothing analyzed yet</span>
+            </CommandItem>
+          )}
+          {recentAnalyzed.map((company) => (
+            <CommandItem key={`recent-${company.id}`} onSelect={() => go(`/accounts/${company.id}`)}>
+              <FileSearch className="h-4 w-4 text-white/40" />
+              <span>{company.name} — Executive Report</span>
+            </CommandItem>
+          ))}
         </CommandGroup>
 
         <CommandSeparator />
