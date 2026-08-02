@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { Check } from "lucide-react";
+import { Check, X } from "lucide-react";
 import type { WorkspaceStreamStep } from "@/types";
 import { cn } from "@/lib/utils";
 
@@ -32,11 +32,15 @@ export function StreamSteps({ steps, chips = [] }: StreamStepsProps) {
                 "flex h-4 w-4 shrink-0 items-center justify-center rounded-full border transition-colors duration-300",
                 step.status === "done"
                   ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-400"
-                  : "border-white/20 bg-white/[0.04] text-transparent",
+                  : step.status === "error"
+                    ? "border-red-500/40 bg-red-500/15 text-red-400"
+                    : "border-white/20 bg-white/[0.04] text-transparent",
               )}
             >
               {step.status === "done" ? (
                 <Check className="h-2.5 w-2.5" />
+              ) : step.status === "error" ? (
+                <X className="h-2.5 w-2.5" />
               ) : (
                 <motion.span
                   className="h-1.5 w-1.5 rounded-full bg-white/70"
@@ -48,10 +52,17 @@ export function StreamSteps({ steps, chips = [] }: StreamStepsProps) {
             <span
               className={cn(
                 "text-[13px] leading-relaxed transition-colors duration-300",
-                step.status === "done" ? "text-white/45" : "text-white/85",
+                step.status === "done"
+                  ? "text-white/45"
+                  : step.status === "error"
+                    ? "text-red-400"
+                    : "text-white/85",
               )}
             >
               {step.label}
+              {step.agent && step.status === "active" && (
+                <span className="ml-1.5 text-[10px] text-white/30">— {step.agent}</span>
+              )}
             </span>
           </motion.div>
         ))}

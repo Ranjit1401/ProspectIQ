@@ -386,6 +386,7 @@ class AssistantService:
 
         return {
             "analysis_id": analysis.id,
+            "company_id": company.id, 
             "research": research,
             "overall_assessment": overall_assessment,
             "knowledge_id": record.id,

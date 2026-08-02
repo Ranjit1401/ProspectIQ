@@ -1,4 +1,4 @@
-import { apiFetch } from "./api-client";
+import { apiFetch, API_BASE_URL, ApiError, getToken } from "./api-client";
 
 export interface KnowledgeData {
   company?: string;
@@ -35,6 +35,7 @@ export interface ExecutionMetrics {
 
 export interface AnalyzeResponse {
   analysis_id: number;
+  company_id: number;
   overall_assessment: OverallAssessment;
   knowledge_id: number;
   knowledge: KnowledgeData;
@@ -209,18 +210,98 @@ export interface WorkspaceStats {
   trust_distribution: TrustDistributionApiResult[];
 }
 
+/** One live orchestration frame from GET /executor/stream. */
+export interface StreamStepEvent {
+  id: string;
+  label: string;
+  status: "active" | "done" | "error";
+  agent?: string;
+  detail?: string;
+}
+
+export type StreamFrame =
+  | { type: "step"; data: StreamStepEvent }
+  | { type: "final"; data: SupervisorResponse }
+  | { type: "error"; data: { message: string } };
+
 export const workspaceService = {
   /**
    * Sends free-form text to the Supervisor, which plans the task, routes
    * it to the right agent (the sales-analysis pipeline for company
    * briefs/notes, or the research agent for general questions), and
    * returns whichever result that agent produced.
+   *
+   * This is the blocking version — prefer streamSupervisor() for the
+   * Workspace chat so the person sees each agent's real progress live
+   * instead of waiting on one request.
    */
   async runSupervisor(prompt: string): Promise<SupervisorResponse> {
     return apiFetch<SupervisorResponse>(
       `/supervisor/execute?prompt=${encodeURIComponent(prompt)}`,
       { method: "POST" },
     );
+  },
+
+  /**
+   * Live version of runSupervisor(): opens GET /executor/stream and
+   * calls `onFrame` for every Server-Sent Event the backend emits as
+   * Planner -> Router -> Research/Sales-Analysis pipeline actually runs
+   * (real emit_step() calls from the agents themselves, not a scripted
+   * client-side animation). Resolves once the stream ends (after the
+   * "final" or "error" frame).
+   */
+  async streamSupervisor(
+    prompt: string,
+    onFrame: (frame: StreamFrame) => void,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    const token = getToken();
+    const headers: Record<string, string> = { Accept: "text/event-stream" };
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+
+    const response = await fetch(
+      `${API_BASE_URL}/executor/stream?prompt=${encodeURIComponent(prompt)}`,
+      { headers, signal },
+    );
+
+    if (!response.ok || !response.body) {
+      const body = await response.text().catch(() => "");
+      throw new ApiError(body || response.statusText, response.status);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+
+      let boundary: number;
+      while ((boundary = buffer.indexOf("\n\n")) !== -1) {
+        const rawFrame = buffer.slice(0, boundary);
+        buffer = buffer.slice(boundary + 2);
+
+        let eventType = "message";
+        const dataLines: string[] = [];
+
+        for (const line of rawFrame.split("\n")) {
+          if (line.startsWith("event:")) eventType = line.slice(6).trim();
+          else if (line.startsWith("data:")) dataLines.push(line.slice(5).trim());
+        }
+
+        if (dataLines.length === 0) continue;
+
+        try {
+          const data = JSON.parse(dataLines.join("\n"));
+          onFrame({ type: eventType, data } as StreamFrame);
+        } catch {
+          // Malformed SSE frame — skip it rather than crash the stream.
+        }
+      }
+    }
   },
 
   /**

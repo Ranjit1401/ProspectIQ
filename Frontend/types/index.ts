@@ -117,7 +117,8 @@ export interface ChatMessage {
 export interface WorkspaceStreamStep {
   id: string;
   label: string;
-  status: "active" | "done";
+  status: "active" | "done" | "error";
+  agent?: string;
 }
 
 export interface WorkspaceReportCompletion {
@@ -127,6 +128,10 @@ export interface WorkspaceReportCompletion {
   buyingStage?: string;
   nextAction?: string;
   approved?: boolean;
+  /** Analysis row this report was generated from — needed to POST /queue/generate/{analysisId}. */
+  analysisId?: number;
+  /** Company this report belongs to — needed to deep-link into the Relationship Graph. */
+  companyId?: number | string;
 }
 
 export interface Recommendation {

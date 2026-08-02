@@ -1,10 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { FileCheck2, Eye, ExternalLink, Download } from "lucide-react";
+import { FileCheck2, Eye, Sparkles, Network, Loader2, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { queueService } from "@/services/queue.service";
+import { ApiError } from "@/services/api-client";
 import type { WorkspaceReportCompletion } from "@/types";
 
 interface ReportReadyCardProps {
@@ -12,24 +15,39 @@ interface ReportReadyCardProps {
   onPreview?: () => void;
 }
 
-/**
- * Completion state shown once the pipeline finishes a company analysis.
- * The report page itself isn't built yet, so "Open Report" and
- * "Download PDF" surface a lightweight inline note rather than pretending
- * to navigate somewhere real.
- */
 export function ReportReadyCard({ report, onPreview }: ReportReadyCardProps) {
-  const [note, setNote] = useState<string | null>(null);
+  const router = useRouter();
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [generated, setGenerated] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   function handlePreview() {
     setPreviewOpen((v) => !v);
     onPreview?.();
   }
 
-  function handleComingSoon(action: string) {
-    setNote(`${action} — the full report page is coming soon.`);
-    window.setTimeout(() => setNote(null), 2600);
+  async function handleGenerateDraft() {
+    if (!report.analysisId || generating || generated) return;
+    setGenerating(true);
+    setError(null);
+    try {
+      const draft = await queueService.generate(report.analysisId);
+      setGenerated(draft.id);
+    } catch (err) {
+      setError(
+        err instanceof ApiError
+          ? err.message || "Could not generate the outreach draft."
+          : "Could not reach the backend. Make sure the FastAPI server is running.",
+      );
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  function handleViewGraph() {
+    if (!report.companyId) return;
+    router.push(`/graph?company=${report.companyId}`);
   }
 
   return (
@@ -45,9 +63,7 @@ export function ReportReadyCard({ report, onPreview }: ReportReadyCardProps) {
         </div>
         <div className="min-w-0">
           <p className="text-[13px] font-medium text-white/90">Executive Report Ready</p>
-          {report.company && (
-            <p className="truncate text-[11px] text-white/40">{report.company}</p>
-          )}
+          {report.company && <p className="truncate text-[11px] text-white/40">{report.company}</p>}
         </div>
       </div>
 
@@ -56,13 +72,33 @@ export function ReportReadyCard({ report, onPreview }: ReportReadyCardProps) {
           <Eye className="h-3.5 w-3.5" />
           {previewOpen ? "Hide preview" : "Preview Report"}
         </Button>
-        <Button size="sm" variant="outline" onClick={() => handleComingSoon("Open Report")} className="gap-1.5">
-          <ExternalLink className="h-3.5 w-3.5" />
-          Open Report
-        </Button>
-        <Button size="sm" variant="outline" onClick={() => handleComingSoon("Download PDF")} className="gap-1.5">
-          <Download className="h-3.5 w-3.5" />
-          Download PDF
+
+        {report.approved ? (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleGenerateDraft}
+            disabled={!report.analysisId || generating || !!generated}
+            className="gap-1.5"
+          >
+            {generating ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : generated ? (
+              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+            ) : (
+              <Sparkles className="h-3.5 w-3.5" />
+            )}
+            {generated ? "Draft added to Queue" : generating ? "Generating…" : "Generate Outreach Draft"}
+          </Button>
+        ) : (
+          <Badge variant="danger" className="self-center">
+            Needs Guardrail approval before outreach can be drafted
+          </Badge>
+        )}
+
+        <Button size="sm" variant="outline" onClick={handleViewGraph} disabled={!report.companyId} className="gap-1.5">
+          <Network className="h-3.5 w-3.5" />
+          View Relationship Graph
         </Button>
       </div>
 
@@ -102,7 +138,20 @@ export function ReportReadyCard({ report, onPreview }: ReportReadyCardProps) {
         )}
       </AnimatePresence>
 
-      {note && <p className="mt-2 text-[11px] text-white/35">{note}</p>}
+      {error && <p className="mt-2 text-[11px] text-red-400">{error}</p>}
+      {generated && !error && (
+        <p className="mt-2 text-[11px] text-white/35">
+          Draft #{generated} is now pending in the{" "}
+          <button
+            type="button"
+            onClick={() => router.push("/queue")}
+            className="text-emerald-400 underline underline-offset-2 hover:text-emerald-300"
+          >
+            Outreach Queue
+          </button>
+          .
+        </p>
+      )}
     </motion.div>
   );
 }

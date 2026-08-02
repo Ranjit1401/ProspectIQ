@@ -963,6 +963,31 @@ def _slugify(value: str) -> str:
     slug = re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
     return slug or "unknown"
 
+def _to_text(value) -> str:
+    """
+    Coerce whatever the LLM/persona agent actually returned into a plain
+    string. `primary_decision_maker` (and similar persona/knowledge
+    fields) are documented as strings, but the underlying LLM
+    occasionally returns a structured object instead (e.g.
+    {"name": "Sarah Chen", "title": "CTO"}) — without this, calling
+    .strip()/.lower() on that dict crashes the whole endpoint with a
+    500. This normalizes any shape (dict, list, None, str) down to text
+    instead of trusting the LLM's output format.
+    """
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, dict):
+        for key in ("name", "primary_decision_maker", "decision_maker", "title"):
+            candidate = value.get(key)
+            if isinstance(candidate, str) and candidate:
+                return candidate
+        return " ".join(str(v) for v in value.values() if isinstance(v, str)) or ""
+    if isinstance(value, (list, tuple)):
+        return ", ".join(_to_text(v) for v in value if v)
+    return str(value)
+
 
 def _latest_knowledge_for_company(
     db: Session,
@@ -994,8 +1019,12 @@ def _latest_knowledge_for_company(
     return latest_analysis, knowledge_source.processed_data.get("knowledge", {})
 
 
-def _infer_influence(name: str, role: str, primary_decision_maker: str) -> str:
-    role_lower = (role or "").lower()
+def _infer_influence(name, role, primary_decision_maker) -> str:
+    name = _to_text(name)
+    role = _to_text(role)
+    primary_decision_maker = _to_text(primary_decision_maker)
+
+    role_lower = role.lower()
 
     if name and primary_decision_maker and name.strip().lower() == primary_decision_maker.strip().lower():
         return "Decision Maker"
@@ -1025,7 +1054,7 @@ async def company_stakeholders(
 
     knowledge = knowledge or {}
     persona = analysis.persona or {}
-    primary_decision_maker = persona.get("primary_decision_maker", "")
+    primary_decision_maker = _to_text(persona.get("primary_decision_maker", ""))
 
     contacts = knowledge.get("contacts", []) or []
     pain_points = knowledge.get("pain_points", []) or []
@@ -1037,15 +1066,15 @@ async def company_stakeholders(
     # the source text didn't include emails/phone numbers.
     if not contacts:
         contacts = [
-            {"name": name, "role": "", "email": "", "phone": ""}
+            {"name": _to_text(name), "role": "", "email": "", "phone": ""}
             for name in (knowledge.get("decision_makers", []) or [])
         ]
 
     stakeholders = []
 
     for contact in contacts:
-        name = contact.get("name", "") or "Unknown"
-        role = contact.get("role", "")
+        name = _to_text(contact.get("name", "")) or "Unknown"
+        role = _to_text(contact.get("role", ""))
 
         stakeholders.append(
             {
@@ -1146,12 +1175,12 @@ async def company_graph(
 
     knowledge = knowledge or {}
     persona = analysis.persona or {}
-    primary_decision_maker = persona.get("primary_decision_maker", "")
+    primary_decision_maker = _to_text(persona.get("primary_decision_maker", ""))
 
     contacts = knowledge.get("contacts", []) or []
     if not contacts:
         contacts = [
-            {"name": name, "role": ""}
+            {"name": _to_text(name), "role": ""}
             for name in (knowledge.get("decision_makers", []) or [])
         ]
 
@@ -1163,8 +1192,8 @@ async def company_graph(
     decision_maker_id = None
 
     for contact in contacts:
-        name = contact.get("name", "") or "Unknown"
-        role = contact.get("role", "")
+        name = _to_text(contact.get("name", "")) or "Unknown"
+        role = _to_text(contact.get("role", ""))
         node_id = _slugify(f"{company_id}-{name}")
         influence = _infer_influence(name, role, primary_decision_maker)
 

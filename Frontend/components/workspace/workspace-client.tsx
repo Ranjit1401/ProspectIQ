@@ -1,11 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { ChatPanel } from "@/components/workspace/chat-panel";
 import { ExecutiveBriefPanel, HistorySidebar } from "@/components/workspace/executive-brief-panel";
-import { buildStreamScript } from "@/components/workspace/stream-script";
 import type { ComposerAttachment, WorkspaceMode } from "@/components/workspace/prompt-composer";
-import { workspaceService, type AnalyzeResponse } from "@/services/workspace.service";
+import {
+  workspaceService,
+  type AnalyzeResponse,
+  type StreamFrame,
+  type SupervisorResponse,
+} from "@/services/workspace.service";
 import { ApiError } from "@/services/api-client";
 import type { ChatMessage, WorkspaceStreamStep } from "@/types";
 
@@ -17,17 +21,128 @@ const WELCOME: ChatMessage = {
   timestamp: new Date().toISOString(),
 };
 
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
+/** Resource chip shown for whatever the person actually attached in the composer. */
+const CHIP_BY_KIND: Record<ComposerAttachment["kind"], string> = {
+  pdf: "PDF",
+  csv: "CSV",
+  url: "Website",
+  crm: "CRM",
+  gmail: "Emails",
+  drive: "Drive",
+  notion: "Notion",
+  calendar: "Calendar",
+};
 
 export function WorkspaceClient() {
   const [messages, setMessages] = useState<ChatMessage[]>([WELCOME]);
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState<AnalyzeResponse | null>(null);
+  const [activeCompanyId, setActiveCompanyId] = useState<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   function patchMessage(id: string, patch: Partial<ChatMessage>) {
     setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, ...patch } : m)));
+  }
+
+  function reportFromAnalysis(analysis: AnalyzeResponse) {
+    const assessment = analysis.overall_assessment;
+    return {
+      company: assessment?.company || analysis.knowledge?.company,
+      recommendation: assessment?.overall_recommendation,
+      riskLevel: assessment?.risk_level,
+      buyingStage: assessment?.buying_stage,
+      nextAction: assessment?.next_action,
+      approved: assessment?.approved,
+      analysisId: analysis.analysis_id,
+      companyId: analysis.company_id,
+    };
+  }
+
+  /**
+   * "Recent Sessions" used to link out to /accounts/{id}. There's no
+   * stored chat transcript to replay, but every session's full analysis
+   * result IS stored (GET /analysis/{id}) — so reopening a session pulls
+   * that company's most recent analysis back in as a report card right
+   * inside the current conversation, instead of navigating away.
+   */
+  async function handleSelectCompany(companyId: string) {
+    setActiveCompanyId(companyId);
+
+    const noteId = `m-${Date.now()}`;
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: noteId,
+        role: "assistant",
+        content: "",
+        timestamp: new Date().toISOString(),
+        kind: "loading",
+      },
+    ]);
+    setSending(true);
+
+    try {
+      const dashboard = await workspaceService.getCompanyDashboard(companyId);
+
+      if ("error" in dashboard) {
+        patchMessage(noteId, { kind: "text", content: dashboard.error });
+        return;
+      }
+
+      const analysis = await workspaceService.getAnalysis(dashboard.latest_analysis.analysis_id);
+      setResult(analysis);
+
+      patchMessage(noteId, {
+        kind: "report",
+        content: `Reopened your most recent session for ${dashboard.company.name}.`,
+        report: reportFromAnalysis(analysis),
+      });
+    } catch (err) {
+      patchMessage(noteId, {
+        kind: "text",
+        content:
+          err instanceof ApiError
+            ? err.message || "Could not reopen that session."
+            : "Could not reach the backend. Make sure the FastAPI server is running.",
+      });
+    } finally {
+      setSending(false);
+    }
+  }
+
+  function applyFinalResult(response: SupervisorResponse, assistantId: string) {
+    if (response.agent === "sales_analysis") {
+      const analysis = response.result.response as AnalyzeResponse;
+      setResult(analysis);
+      setActiveCompanyId(String(analysis.company_id));
+      const assessment = analysis.overall_assessment;
+      const replyContent =
+        assessment?.overall_recommendation ||
+        "Analysis complete — see the executive brief for the full breakdown.";
+
+      patchMessage(assistantId, {
+        kind: "report",
+        content: replyContent,
+        steps: undefined,
+        chips: undefined,
+        report: reportFromAnalysis(analysis),
+      });
+    } else {
+      // Research agent — don't touch the executive brief panel, this
+      // wasn't a company analysis.
+      const researchResponse = response.result.response as { content?: string };
+      const replyContent =
+        researchResponse?.content ||
+        (typeof response.result.response === "string" ? response.result.response : null) ||
+        "Here's what I found.";
+
+      patchMessage(assistantId, {
+        kind: "text",
+        content: replyContent,
+        steps: undefined,
+        chips: undefined,
+      });
+    }
   }
 
   async function handleSend(
@@ -53,42 +168,55 @@ export function WorkspaceClient() {
     setMessages((prev) => [...prev, userMessage, assistantMessage]);
     setSending(true);
 
-    // The Supervisor plans the task and routes it to whichever agent fits:
-    // the sales-analysis pipeline for company briefs/notes, or the
-    // research agent for general questions. This call is unchanged — it
-    // just now runs alongside the visual stream instead of blocking it.
-    const apiPromise = workspaceService
-      .runSupervisor(text)
-      .then((response) => ({ ok: true as const, response }))
-      .catch((err: unknown) => ({ ok: false as const, err }));
-
-    // Brief loader before the step-by-step trail takes over.
-    await sleep(650);
-
-    const script = buildStreamScript(meta.mode, meta.attachments);
+    // Resource chips for whatever was actually attached — known upfront,
+    // unlike the agent steps below which arrive live as the real backend
+    // pipeline (Planner -> Router -> Research/Sales-Analysis agents) runs.
+    const chips: string[] = meta.attachments.map((a) => CHIP_BY_KIND[a.kind]).filter(Boolean);
     const steps: WorkspaceStreamStep[] = [];
-    const chips: string[] = [];
+    let streaming = false;
 
-    patchMessage(assistantId, { kind: "stream", steps: [], chips: [] });
+    function upsertStep(evt: { id: string; label: string; status: WorkspaceStreamStep["status"]; agent?: string }) {
+      const idx = steps.findIndex((s) => s.id === evt.id);
+      const nextStep: WorkspaceStreamStep = { id: evt.id, label: evt.label, status: evt.status, agent: evt.agent };
+      if (idx === -1) steps.push(nextStep);
+      else steps[idx] = nextStep;
 
-    for (let i = 0; i < script.length; i++) {
-      const scripted = script[i];
-      steps.push({ id: `${assistantId}-s${i}`, label: scripted.label, status: "active" });
-      patchMessage(assistantId, { steps: [...steps] });
+      if (evt.agent && !chips.includes(evt.agent)) chips.push(evt.agent);
 
-      await sleep(420 + Math.random() * 260);
-
-      steps[steps.length - 1] = { ...steps[steps.length - 1], status: "done" };
-      if (scripted.chip && !chips.includes(scripted.chip)) chips.push(scripted.chip);
-      patchMessage(assistantId, { steps: [...steps], chips: [...chips] });
+      if (!streaming) {
+        streaming = true;
+        patchMessage(assistantId, { kind: "stream", steps: [...steps], chips: [...chips] });
+      } else {
+        patchMessage(assistantId, { steps: [...steps], chips: [...chips] });
+      }
     }
 
-    const outcome = await apiPromise;
+    const controller = new AbortController();
+    abortRef.current = controller;
 
-    if (!outcome.ok) {
+    try {
+      await workspaceService.streamSupervisor(
+        text,
+        (frame: StreamFrame) => {
+          if (frame.type === "step") {
+            upsertStep(frame.data);
+          } else if (frame.type === "final") {
+            applyFinalResult(frame.data, assistantId);
+          } else if (frame.type === "error") {
+            patchMessage(assistantId, {
+              kind: "text",
+              content: `The pipeline returned an error: ${frame.data.message}`,
+              steps: undefined,
+              chips: undefined,
+            });
+          }
+        },
+        controller.signal,
+      );
+    } catch (err) {
       const message =
-        outcome.err instanceof ApiError
-          ? `The pipeline returned an error: ${outcome.err.message}`
+        err instanceof ApiError
+          ? `The pipeline returned an error: ${err.message}`
           : "Could not reach the backend. Make sure the FastAPI server is running.";
 
       patchMessage(assistantId, {
@@ -97,58 +225,16 @@ export function WorkspaceClient() {
         steps: undefined,
         chips: undefined,
       });
+    } finally {
+      abortRef.current = null;
       setSending(false);
-      return;
     }
-
-    const { response } = outcome;
-
-    if (response.agent === "sales_analysis") {
-      const analysis = response.result.response as AnalyzeResponse;
-      setResult(analysis);
-      const assessment = analysis.overall_assessment;
-      const replyContent =
-        assessment?.overall_recommendation ||
-        "Analysis complete — see the executive brief for the full breakdown.";
-
-      patchMessage(assistantId, {
-        kind: "report",
-        content: replyContent,
-        steps: undefined,
-        chips: undefined,
-        report: {
-          company: assessment?.company || analysis.knowledge?.company,
-          recommendation: assessment?.overall_recommendation,
-          riskLevel: assessment?.risk_level,
-          buyingStage: assessment?.buying_stage,
-          nextAction: assessment?.next_action,
-          approved: assessment?.approved,
-        },
-      });
-    } else {
-      // Research agent — don't touch the executive brief panel, this
-      // wasn't a company analysis.
-      const researchResponse = response.result.response as { content?: string };
-      const replyContent =
-        researchResponse?.content ||
-        (typeof response.result.response === "string" ? response.result.response : null) ||
-        "Here's what I found.";
-
-      patchMessage(assistantId, {
-        kind: "text",
-        content: replyContent,
-        steps: undefined,
-        chips: undefined,
-      });
-    }
-
-    setSending(false);
   }
 
   return (
     <div className="grid h-[calc(100vh-8rem)] grid-cols-1 gap-5 lg:grid-cols-[240px_1fr_300px]">
       <div className="hidden lg:block">
-        <HistorySidebar />
+        <HistorySidebar onSelectCompany={handleSelectCompany} activeCompanyId={activeCompanyId} />
       </div>
 
       <div className="min-h-0">

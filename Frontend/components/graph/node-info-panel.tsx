@@ -41,8 +41,8 @@ export function NodeInfoPanel({
             <div>
               <p className="text-[10px] uppercase tracking-wider text-white/30">Evidence</p>
               <ul className="mt-1.5 space-y-1">
-                {node.evidence.map((e) => (
-                  <li key={e} className="text-[12px] leading-relaxed text-white/55">
+                {node.evidence.map((e, index) => (
+                  <li key={`${index}-${e}`} className="text-[12px] leading-relaxed text-white/55">
                     · {e}
                   </li>
                 ))}
@@ -53,8 +53,8 @@ export function NodeInfoPanel({
               <div>
                 <p className="text-[10px] uppercase tracking-wider text-white/30">Pain Points</p>
                 <ul className="mt-1.5 space-y-1">
-                  {node.painPoints.map((p) => (
-                    <li key={p} className="text-[12px] leading-relaxed text-white/55">
+                  {node.painPoints.map((p, index) => (
+                    <li key={`${index}-${p}`} className="text-[12px] leading-relaxed text-white/55">
                       · {p}
                     </li>
                   ))}
@@ -66,8 +66,8 @@ export function NodeInfoPanel({
               <div>
                 <p className="text-[10px] uppercase tracking-wider text-white/30">Buying Signals</p>
                 <ul className="mt-1.5 space-y-1">
-                  {node.buyingSignals.map((s) => (
-                    <li key={s} className="text-[12px] leading-relaxed text-white/55">
+                  {node.buyingSignals.map((s, index) => (
+                    <li key={`${index}-${s}`} className="text-[12px] leading-relaxed text-white/55">
                       · {s}
                     </li>
                   ))}

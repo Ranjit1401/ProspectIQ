@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScoreRing } from "@/components/common/score-ring";
@@ -69,7 +68,13 @@ export function ExecutiveBriefPanel({ assessment, knowledge }: ExecutiveBriefPan
   );
 }
 
-export function HistorySidebar() {
+export function HistorySidebar({
+  onSelectCompany,
+  activeCompanyId,
+}: {
+  onSelectCompany?: (companyId: string) => void;
+  activeCompanyId?: string | null;
+}) {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -110,10 +115,15 @@ export function HistorySidebar() {
           )}
 
           {companies.map((company) => (
-            <Link
+            <button
               key={company.id}
-              href={`/accounts/${company.id}`}
-              className="flex items-center justify-between rounded-lg px-2 py-2 text-xs text-white/45 hover:bg-white/[0.04] hover:text-white/80 transition-colors"
+              type="button"
+              onClick={() => onSelectCompany?.(company.id)}
+              className={`flex w-full items-center justify-between rounded-lg px-2 py-2 text-left text-xs transition-colors ${
+                activeCompanyId === company.id
+                  ? "bg-white/[0.06] text-white/85"
+                  : "text-white/45 hover:bg-white/[0.04] hover:text-white/80"
+              }`}
             >
               <span className="flex items-center gap-2">
                 <span className="flex h-6 w-6 items-center justify-center rounded-md bg-white/[0.06] text-[10px] text-white/60">
@@ -122,7 +132,7 @@ export function HistorySidebar() {
                 {company.name}
               </span>
               <span className="text-[10px] text-white/25">{company.score}</span>
-            </Link>
+            </button>
           ))}
         </div>
       </ScrollArea>

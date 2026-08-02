@@ -41,8 +41,11 @@ export function EvidenceList({ items }: { items: string[] }) {
         <CardTitle>Evidence</CardTitle>
       </CardHeader>
       <CardContent className="space-y-2.5">
-        {items.map((item) => (
-          <div key={item} className="flex items-start gap-2.5 rounded-lg border border-white/6 bg-white/[0.02] p-3">
+        {items.map((item, index) => (
+          <div
+            key={`${index}-${item}`}
+            className="flex items-start gap-2.5 rounded-lg border border-white/6 bg-white/[0.02] p-3"
+          >
             <FileText className="mt-0.5 h-3.5 w-3.5 shrink-0 text-white/30" />
             <span className="text-[13px] text-white/55">{item}</span>
           </div>
