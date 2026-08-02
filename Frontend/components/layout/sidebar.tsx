@@ -18,6 +18,7 @@ import {
 import { NAV_ITEMS, APP_NAME } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { useCurrentUser } from "@/components/auth/auth-guard";
 
 const ICONS: Record<string, React.ElementType> = {
   workspace: Sparkles,
@@ -30,6 +31,15 @@ const ICONS: Record<string, React.ElementType> = {
 
 export function Sidebar({ onOpenPalette }: { onOpenPalette: () => void }) {
   const pathname = usePathname();
+  const user = useCurrentUser();
+
+  const displayName = user?.username || "Account";
+  const initials = displayName
+    .split(" ")
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 
   return (
     <aside className="hidden lg:flex h-screen w-[248px] shrink-0 flex-col border-r border-white/6 bg-[#0b0b0b]/80 backdrop-blur-xl">
@@ -92,11 +102,11 @@ export function Sidebar({ onOpenPalette }: { onOpenPalette: () => void }) {
           )}
         >
           <Avatar className="h-7 w-7">
-            <AvatarFallback>AK</AvatarFallback>
+            <AvatarFallback>{initials}</AvatarFallback>
           </Avatar>
           <div className="flex flex-col leading-tight">
-            <span className="text-xs font-medium text-white/85">Alex Kim</span>
-            <span className="text-[10px] text-white/35">AE Lead</span>
+            <span className="text-xs font-medium text-white/85">{displayName}</span>
+            <span className="text-[10px] text-white/35">{user?.email ?? ""}</span>
           </div>
           <User className="ml-auto h-3.5 w-3.5 text-white/25" />
         </Link>
