@@ -50,6 +50,7 @@ class SalesAnalysisAgent(BaseAgent):
             text=task,
             current_user=current_user,
             db=db,
+            emit=kwargs.get("emit"),
         )
 
         return {

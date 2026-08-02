@@ -13,6 +13,7 @@ from app.services.analysis_service import AnalysisService
 from app.services.knowledge_service import KnowledgeService
 from app.services.company_service import CompanyService
 from app.core.context import context
+from app.core.events import emit_step
 
 
 class AssistantService:
@@ -32,6 +33,7 @@ class AssistantService:
         text: str,
         current_user: User,
         db: Session,
+        emit=None,
     ):
         start_time = time.perf_counter()
         timeline = []
@@ -40,6 +42,14 @@ class AssistantService:
         # Step 0 : Research Agent
         # =====================================================
         step_start = time.perf_counter()
+
+        await emit_step(
+            emit,
+            id="research",
+            label="Researching the company (web, website, news)...",
+            status="active",
+            agent="Research Agent",
+        )
 
         research_agent = context.agent_registry.get("research")
 
@@ -52,11 +62,20 @@ class AssistantService:
             task=text,
             current_user=current_user,
             db=db,
+            emit=emit,
         )
 
         # Send research evidence into downstream knowledge pipeline
         if research and isinstance(research, dict) and research.get("evidence"):
             text = research["evidence"]
+
+        await emit_step(
+            emit,
+            id="research",
+            label="Research complete.",
+            status="done",
+            agent="Research Agent",
+        )
 
         timeline.append(
             {
@@ -75,7 +94,23 @@ class AssistantService:
         # =====================================================
         step_start = time.perf_counter()
 
+        await emit_step(
+            emit,
+            id="ingestion",
+            label="Extracting structured company knowledge...",
+            status="active",
+            agent="Knowledge Ingestion",
+        )
+
         normalized = await self.ingestion.ingest(text=text)
+
+        await emit_step(
+            emit,
+            id="ingestion",
+            label="Company knowledge extracted.",
+            status="done",
+            agent="Knowledge Ingestion",
+        )
 
         timeline.append(
             {
@@ -94,6 +129,14 @@ class AssistantService:
         # =====================================================
         step_start = time.perf_counter()
 
+        await emit_step(
+            emit,
+            id="knowledge_save",
+            label="Saving knowledge to the repository...",
+            status="active",
+            agent="Knowledge Repository",
+        )
+
         record = self.knowledge_service.save(
             db=db,
             user_id=current_user.id,
@@ -107,6 +150,14 @@ class AssistantService:
             name=knowledge.get("company", ""),
             website=knowledge.get("website", ""),
             industry=knowledge.get("industry", ""),
+        )
+
+        await emit_step(
+            emit,
+            id="knowledge_save",
+            label=f"Knowledge saved for {knowledge.get('company', 'this account')}.",
+            status="done",
+            agent="Knowledge Repository",
         )
 
         timeline.append(
@@ -126,7 +177,23 @@ class AssistantService:
         # =====================================================
         step_start = time.perf_counter()
 
+        await emit_step(
+            emit,
+            id="persona",
+            label="Identifying stakeholders and decision makers...",
+            status="active",
+            agent="Persona Agent",
+        )
+
         persona = await self.persona.analyze(knowledge)
+
+        await emit_step(
+            emit,
+            id="persona",
+            label="Stakeholder persona built.",
+            status="done",
+            agent="Persona Agent",
+        )
 
         timeline.append(
             {
@@ -145,7 +212,23 @@ class AssistantService:
         # =====================================================
         step_start = time.perf_counter()
 
+        await emit_step(
+            emit,
+            id="intent",
+            label="Scoring buying intent and priority...",
+            status="active",
+            agent="Intent Agent",
+        )
+
         intent = await self.intent.analyze(knowledge)
+
+        await emit_step(
+            emit,
+            id="intent",
+            label=f"Intent scored ({intent.get('intent_score', 0)}/100).",
+            status="done",
+            agent="Intent Agent",
+        )
 
         timeline.append(
             {
@@ -164,7 +247,23 @@ class AssistantService:
         # =====================================================
         step_start = time.perf_counter()
 
+        await emit_step(
+            emit,
+            id="strategy",
+            label="Drafting outreach strategy and next best action...",
+            status="active",
+            agent="Strategy Agent",
+        )
+
         strategy = await self.strategy.generate(knowledge, persona, intent)
+
+        await emit_step(
+            emit,
+            id="strategy",
+            label="Strategy ready.",
+            status="done",
+            agent="Strategy Agent",
+        )
 
         timeline.append(
             {
@@ -183,7 +282,25 @@ class AssistantService:
         # =====================================================
         step_start = time.perf_counter()
 
+        await emit_step(
+            emit,
+            id="guardrail",
+            label="Running guardrail / risk check...",
+            status="active",
+            agent="Guardrail Agent",
+        )
+
         guardrail = await self.guardrail.verify(knowledge, persona, intent, strategy)
+
+        await emit_step(
+            emit,
+            id="guardrail",
+            label="Guardrail check complete — report approved."
+            if guardrail.get("approved")
+            else "Guardrail check complete — flagged for review.",
+            status="done",
+            agent="Guardrail Agent",
+        )
 
         timeline.append(
             {
@@ -259,6 +376,14 @@ class AssistantService:
         # =====================================================
         # Final Response
         # =====================================================
+        await emit_step(
+            emit,
+            id="report",
+            label="Executive report ready.",
+            status="done",
+            agent="Sales Analysis Pipeline",
+        )
+
         return {
             "analysis_id": analysis.id,
             "research": research,

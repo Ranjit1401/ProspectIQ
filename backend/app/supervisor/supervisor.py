@@ -1,6 +1,7 @@
 from app.router.router import Router
 from app.planner.planner import Planner
 from app.core.context import context
+from app.core.events import emit_step
 
 from app.agents.knowledge_ingestion.agent import KnowledgeIngestionAgent
 from app.agents.persona.agent import PersonaAgent
@@ -20,18 +21,51 @@ class Supervisor:
         self.router = Router()
         self.planner = Planner()
 
-    async def execute(self, task: str, current_user, db):
+    async def execute(self, task: str, current_user, db, emit=None):
 
         context.memory.add(current_user.id, "user", task)
 
+        await emit_step(
+            emit,
+            id="plan",
+            label="Planning the task...",
+            status="active",
+            agent="Planner",
+        )
+
         plan = await self.planner.create_plan(task)
 
+        await emit_step(
+            emit,
+            id="plan",
+            label="Task plan ready.",
+            status="done",
+            agent="Planner",
+        )
+
+        await emit_step(
+            emit,
+            id="route",
+            label="Routing to the right agent...",
+            status="active",
+            agent="Router",
+        )
+
         agent = await self.router.route(task)
+
+        await emit_step(
+            emit,
+            id="route",
+            label=f"Routed to the {agent.name} agent.",
+            status="done",
+            agent="Router",
+        )
 
         result = await agent.run(
             task,
             current_user=current_user,
             db=db,
+            emit=emit,
         )
 
         response = result.get("response")

@@ -45,6 +45,7 @@
     "typescript": "5.7.3"
   },
   "devDependencies": {
+    "@types/styled-components": "^5.1.36",
     "eslint": "9.18.0",
     "eslint-config-next": "15.5.22"
   }

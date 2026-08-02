@@ -11,5 +11,6 @@ class SupervisorService:
         task: str,
         current_user,
         db,
+        emit=None,
     ):
-        return await self.supervisor.execute(task, current_user, db)
+        return await self.supervisor.execute(task, current_user, db, emit=emit)

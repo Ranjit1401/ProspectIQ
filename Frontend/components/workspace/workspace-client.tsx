@@ -3,10 +3,12 @@
 import { useState } from "react";
 import { ChatPanel } from "@/components/workspace/chat-panel";
 import { ExecutiveBriefPanel, HistorySidebar } from "@/components/workspace/executive-brief-panel";
-import { buildStreamScript } from "@/components/workspace/stream-script";
 import type { ComposerAttachment, WorkspaceMode } from "@/components/workspace/prompt-composer";
-import { workspaceService, type AnalyzeResponse } from "@/services/workspace.service";
-import { ApiError } from "@/services/api-client";
+import {
+  workspaceService,
+  type AnalyzeResponse,
+  type WorkspaceLiveStep,
+} from "@/services/workspace.service";
 import type { ChatMessage, WorkspaceStreamStep } from "@/types";
 
 const WELCOME: ChatMessage = {
@@ -16,10 +18,6 @@ const WELCOME: ChatMessage = {
     "Send me a company brief, some notes, or a website summary and I'll run it through the research pipeline — knowledge extraction, persona, intent, strategy, and a guardrail check. Ask me a general question instead and I'll just answer it directly.",
   timestamp: new Date().toISOString(),
 };
-
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
 
 export function WorkspaceClient() {
   const [messages, setMessages] = useState<ChatMessage[]>([WELCOME]);
@@ -53,43 +51,86 @@ export function WorkspaceClient() {
 
     setMessages((prev) => [...prev, userMessage, assistantMessage]);
     setSending(true);
+    patchMessage(assistantId, { kind: "stream", steps: [], chips: [] });
 
-    // The Supervisor plans the task and routes it to whichever agent fits:
-    // the sales-analysis pipeline for company briefs/notes, or the
-    // research agent for general questions. This call is unchanged — it
-    // just now runs alongside the visual stream instead of blocking it.
-    const apiPromise = workspaceService
-      .runSupervisor(text)
-      .then((response) => ({ ok: true as const, response }))
-      .catch((err: unknown) => ({ ok: false as const, err }));
-
-    // Brief loader before the step-by-step trail takes over.
-    await sleep(650);
-
-    const script = buildStreamScript(meta.mode, meta.attachments);
+    // Live trail of whatever the backend agents are actually doing right
+    // now — the Supervisor plans the task, the Router picks an agent
+    // (sales-analysis pipeline for company briefs/notes, or the research
+    // agent for general questions), and each agent along the way reports
+    // its own progress as it runs. Every label below comes straight from
+    // the backend event, nothing here is scripted on the frontend.
     const steps: WorkspaceStreamStep[] = [];
     const chips: string[] = [];
 
-    patchMessage(assistantId, { kind: "stream", steps: [], chips: [] });
+    function handleLiveStep(step: WorkspaceLiveStep) {
+      const existingIndex = steps.findIndex((s) => s.id === step.id);
+      const uiStep: WorkspaceStreamStep = {
+        id: step.id,
+        label: step.label,
+        status: step.status === "active" ? "active" : "done",
+      };
 
-    for (let i = 0; i < script.length; i++) {
-      const scripted = script[i];
-      steps.push({ id: `${assistantId}-s${i}`, label: scripted.label, status: "active" });
-      patchMessage(assistantId, { steps: [...steps] });
+      if (existingIndex === -1) {
+        steps.push(uiStep);
+      } else {
+        steps[existingIndex] = uiStep;
+      }
 
-      await sleep(420 + Math.random() * 260);
+      // Once an agent finishes its step, surface its real name as a
+      // chip — this reflects which agents genuinely ran, not a fixed
+      // per-mode list.
+      if (step.status === "done" && step.agent && !chips.includes(step.agent)) {
+        chips.push(step.agent);
+      }
 
-      steps[steps.length - 1] = { ...steps[steps.length - 1], status: "done" };
-      if (scripted.chip && !chips.includes(scripted.chip)) chips.push(scripted.chip);
       patchMessage(assistantId, { steps: [...steps], chips: [...chips] });
     }
 
-    const outcome = await apiPromise;
+    try {
+      const response = await workspaceService.streamSupervisor(text, handleLiveStep);
 
-    if (!outcome.ok) {
+      if (response.agent === "sales_analysis") {
+        const analysis = response.result.response as AnalyzeResponse;
+        setResult(analysis);
+        const assessment = analysis.overall_assessment;
+        const replyContent =
+          assessment?.overall_recommendation ||
+          "Analysis complete — see the executive brief for the full breakdown.";
+
+        patchMessage(assistantId, {
+          kind: "report",
+          content: replyContent,
+          steps: undefined,
+          chips: undefined,
+          report: {
+            company: assessment?.company || analysis.knowledge?.company,
+            recommendation: assessment?.overall_recommendation,
+            riskLevel: assessment?.risk_level,
+            buyingStage: assessment?.buying_stage,
+            nextAction: assessment?.next_action,
+            approved: assessment?.approved,
+          },
+        });
+      } else {
+        // Research agent — don't touch the executive brief panel, this
+        // wasn't a company analysis.
+        const researchResponse = response.result.response as { content?: string };
+        const replyContent =
+          researchResponse?.content ||
+          (typeof response.result.response === "string" ? response.result.response : null) ||
+          "Here's what I found.";
+
+        patchMessage(assistantId, {
+          kind: "text",
+          content: replyContent,
+          steps: undefined,
+          chips: undefined,
+        });
+      }
+    } catch (err) {
       const message =
-        outcome.err instanceof ApiError
-          ? `The pipeline returned an error: ${outcome.err.message}`
+        err instanceof Error
+          ? `The pipeline returned an error: ${err.message}`
           : "Could not reach the backend. Make sure the FastAPI server is running.";
 
       patchMessage(assistantId, {
@@ -98,52 +139,9 @@ export function WorkspaceClient() {
         steps: undefined,
         chips: undefined,
       });
+    } finally {
       setSending(false);
-      return;
     }
-
-    const { response } = outcome;
-
-    if (response.agent === "sales_analysis") {
-      const analysis = response.result.response as AnalyzeResponse;
-      setResult(analysis);
-      const assessment = analysis.overall_assessment;
-      const replyContent =
-        assessment?.overall_recommendation ||
-        "Analysis complete — see the executive brief for the full breakdown.";
-
-      patchMessage(assistantId, {
-        kind: "report",
-        content: replyContent,
-        steps: undefined,
-        chips: undefined,
-        report: {
-          company: assessment?.company || analysis.knowledge?.company,
-          recommendation: assessment?.overall_recommendation,
-          riskLevel: assessment?.risk_level,
-          buyingStage: assessment?.buying_stage,
-          nextAction: assessment?.next_action,
-          approved: assessment?.approved,
-        },
-      });
-    } else {
-      // Research agent — don't touch the executive brief panel, this
-      // wasn't a company analysis.
-      const researchResponse = response.result.response as { content?: string };
-      const replyContent =
-        researchResponse?.content ||
-        (typeof response.result.response === "string" ? response.result.response : null) ||
-        "Here's what I found.";
-
-      patchMessage(assistantId, {
-        kind: "text",
-        content: replyContent,
-        steps: undefined,
-        chips: undefined,
-      });
-    }
-
-    setSending(false);
   }
 
   async function handleHistorySelect(id: number) {

@@ -1,5 +1,6 @@
 from app.agents.base import BaseAgent
 from app.agents.decision import DecisionEngine
+from app.core.events import emit_step
 from app.utils.company_website import find_official_website
 
 
@@ -26,12 +27,29 @@ class ResearchAgentV2(BaseAgent):
         task: str,
         **kwargs,
     ):
+        emit = kwargs.get("emit")
+
         # -----------------------------
         # Build research plan
         # -----------------------------
+        await emit_step(
+            emit,
+            id="research_plan",
+            label="Deciding which tools this task needs...",
+            status="active",
+            agent="ResearchAgentV2",
+        )
+
         decision = await self.decision.choose_tool(task)
 
         if decision is None:
+            await emit_step(
+                emit,
+                id="research_plan",
+                label="No external lookup needed — using the task text directly.",
+                status="done",
+                agent="ResearchAgentV2",
+            )
             return {
                 "agent": self.name,
                 "tool_used": None,
@@ -41,12 +59,28 @@ class ResearchAgentV2(BaseAgent):
 
         tool = decision.get("tool")
 
+        await emit_step(
+            emit,
+            id="research_plan",
+            label=f"Research plan ready — using the {tool} tool.",
+            status="done",
+            agent="ResearchAgentV2",
+        )
+
         # -----------------------------------
         # Search Pipeline
         # -----------------------------------
         if tool == "search":
             queries = decision.get("queries", [task])
             results = []
+
+            await emit_step(
+                emit,
+                id="research_search",
+                label=f"Searching the web ({len(queries)} quer{'y' if len(queries) == 1 else 'ies'})...",
+                status="active",
+                agent="ResearchAgentV2",
+            )
 
             for query in queries:
                 args = await self.decision.extract_arguments(
@@ -75,6 +109,14 @@ class ResearchAgentV2(BaseAgent):
             # Token Optimization: Limit top search results to 5
             top_sources = merged[:5]
 
+            await emit_step(
+                emit,
+                id="research_search",
+                label=f"Found {len(top_sources)} relevant source(s).",
+                status="done",
+                agent="ResearchAgentV2",
+            )
+
             # -----------------------------------
             # Step 2: Official Website
             # -----------------------------------
@@ -82,14 +124,38 @@ class ResearchAgentV2(BaseAgent):
             official_url = find_official_website(top_sources)
 
             if official_url:
+                await emit_step(
+                    emit,
+                    id="research_website",
+                    label=f"Reading the company website ({official_url})...",
+                    status="active",
+                    agent="ResearchAgentV2",
+                )
+
                 website = await self.tools.execute(
                     "website",
                     url=official_url,
                 )
 
+                await emit_step(
+                    emit,
+                    id="research_website",
+                    label="Website content captured.",
+                    status="done",
+                    agent="ResearchAgentV2",
+                )
+
             # -----------------------------------
             # Step 3: News Pipeline
             # -----------------------------------
+            await emit_step(
+                emit,
+                id="research_news",
+                label="Checking for recent news...",
+                status="active",
+                agent="ResearchAgentV2",
+            )
+
             news_args = await self.decision.extract_arguments(
                 tool="news",
                 task=task,
@@ -98,6 +164,14 @@ class ResearchAgentV2(BaseAgent):
             news = await self.tools.execute(
                 "news",
                 **news_args,
+            )
+
+            await emit_step(
+                emit,
+                id="research_news",
+                label=f"News check complete ({len(news.get('results', []) or []) if news else 0} article(s)).",
+                status="done",
+                agent="ResearchAgentV2",
             )
 
             # -----------------------------------
@@ -152,8 +226,24 @@ Competitors
 Business Goals
 """
 
+            await emit_step(
+                emit,
+                id="research_synthesis",
+                label="Synthesizing everything into a single evidence brief...",
+                status="active",
+                agent="ResearchAgentV2",
+            )
+
             response = await self.llm.generate(prompt)
             evidence = response.content
+
+            await emit_step(
+                emit,
+                id="research_synthesis",
+                label="Evidence brief ready.",
+                status="done",
+                agent="ResearchAgentV2",
+            )
 
             # -----------------------------------
             # Step 6: Final Return
@@ -176,6 +266,14 @@ Business Goals
         # Calculator
         # -----------------------------------
         if tool == "calculator":
+            await emit_step(
+                emit,
+                id="research_tool",
+                label="Running the calculator...",
+                status="active",
+                agent="ResearchAgentV2",
+            )
+
             args = await self.decision.extract_arguments(
                 tool,
                 task,
@@ -184,6 +282,14 @@ Business Goals
             result = await self.tools.execute(
                 tool,
                 **args,
+            )
+
+            await emit_step(
+                emit,
+                id="research_tool",
+                label="Calculation complete.",
+                status="done",
+                agent="ResearchAgentV2",
             )
 
             return {
@@ -199,6 +305,14 @@ Business Goals
         # Weather
         # -----------------------------------
         if tool == "weather":
+            await emit_step(
+                emit,
+                id="research_tool",
+                label="Checking the weather...",
+                status="active",
+                agent="ResearchAgentV2",
+            )
+
             args = await self.decision.extract_arguments(
                 tool,
                 task,
@@ -207,6 +321,14 @@ Business Goals
             result = await self.tools.execute(
                 tool,
                 **args,
+            )
+
+            await emit_step(
+                emit,
+                id="research_tool",
+                label="Weather lookup complete.",
+                status="done",
+                agent="ResearchAgentV2",
             )
 
             return {
