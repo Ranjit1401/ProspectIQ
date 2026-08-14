@@ -6,6 +6,9 @@ from app.database.session import get_db
 from app.models.analysis_result import AnalysisResult
 from app.models.user import User
 from app.services.outreach_service import OutreachService
+from app.models.connected_account import ConnectedAccount
+from app.schemas.send_email import SendEmailRequest
+from app.services.gmail_service import GmailService
 
 router = APIRouter(
     prefix="/queue",
@@ -13,7 +16,7 @@ router = APIRouter(
 )
 
 service = OutreachService()
-
+gmail_service = GmailService()
 
 def _serialize(draft, company_name: str):
     return {
@@ -110,3 +113,46 @@ async def edit_draft(
         raise HTTPException(status_code=404, detail="Draft not found")
 
     return _serialize(draft, draft.company.name if draft.company else "")
+
+@router.post("/{draft_id}/send")
+async def send_email(
+    draft_id: int,
+    payload: SendEmailRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+
+    account = (
+        db.query(ConnectedAccount)
+        .filter(
+            ConnectedAccount.user_id == current_user.id,
+            ConnectedAccount.provider == "google",
+        )
+        .first()
+    )
+
+    if account is None:
+
+        raise HTTPException(
+            status_code=400,
+            detail="Gmail not connected",
+        )
+
+    gmail_service.send_email(
+        account,
+        payload.recipient,
+        payload.subject,
+        payload.body,
+    )
+
+    draft = service.set_status(
+        db,
+        current_user.id,
+        draft_id,
+        "approved",
+    )
+
+    return {
+        "success": True,
+        "message": "Email sent successfully",
+    }

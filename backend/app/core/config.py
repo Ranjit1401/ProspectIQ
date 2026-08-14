@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: str = ""
     TAVILY_API_KEY: str = ""
     OPENROUTER_API_KEY: str = ""
+    GOOGLE_CLIENT_ID: str = ""
+    GOOGLE_CLIENT_SECRET: str = ""
+    GOOGLE_REDIRECT_URI: str = "http://localhost:8000/auth/google/callback"
 
 
     DATABASE_URL: str

@@ -32,4 +32,25 @@ export const queueService = {
       method: "POST",
     });
   },
+
+  async sendEmail(
+    draftId: string,
+    recipient: string,
+    subject: string,
+    body: string
+  ): Promise<any> {
+    return apiFetch(`/queue/${draftId}/send`, {
+      method: "POST",
+
+      body: JSON.stringify({
+        recipient,
+        subject,
+        body,
+      }),
+
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+  },
 };

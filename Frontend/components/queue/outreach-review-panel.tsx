@@ -2,7 +2,16 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Check, X, ChevronLeft, ChevronRight, Loader2, Mail, Linkedin, Phone } from "lucide-react";
+import {
+  Check,
+  X,
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
+  Mail,
+  Linkedin,
+  Phone,
+} from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,7 +19,8 @@ import { Separator } from "@/components/ui/separator";
 import { ScoreRing } from "@/components/common/score-ring";
 import { OutreachTimeline } from "@/components/queue/outreach-timeline";
 import type { OutreachDraft } from "@/types";
-
+import { queueService } from "@/services/queue.service";
+import { apiFetch } from "../../services/api-client";
 const CHANNEL_ICON = { email: Mail, linkedin: Linkedin, "call-script": Phone };
 
 export function OutreachReviewPanel({
@@ -30,7 +40,9 @@ export function OutreachReviewPanel({
   onApprove: (id: string) => Promise<void>;
   onReject: (id: string) => Promise<void>;
 }) {
-  const [pendingAction, setPendingAction] = useState<"approve" | "reject" | null>(null);
+  const [pendingAction, setPendingAction] = useState<
+    "approve" | "reject" | null
+  >(null);
 
   const [subject, setSubject] = useState(draft.subject);
   const [body, setBody] = useState(draft.body);
@@ -42,14 +54,12 @@ export function OutreachReviewPanel({
   useEffect(() => {
     async function loadGmailStatus() {
       try {
-        // TODO: Replace with actual service call `await authService.gmailStatus()`
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/google/status`);
-        const res = await response.json();
+        const data: any = await apiFetch("/auth/google/status");
 
-        setSenderConnected(res.connected);
-        setConnectedEmail(res.email || "");
+        setSenderConnected(data.connected);
+        setConnectedEmail(data.email || "");
       } catch (err) {
-        console.error("Failed to fetch Gmail status", err);
+        console.error(err);
       }
     }
 
@@ -67,7 +77,9 @@ export function OutreachReviewPanel({
 
   async function handleConnectGmail() {
     try {
-      window.location.href = `${process.env.NEXT_PUBLIC_API_URL}/auth/google/connect`;
+      const data: any = await apiFetch("/auth/google/login");
+
+      window.location.href = data.authorization_url;
     } catch (err) {
       console.error(err);
     }
@@ -92,18 +104,17 @@ export function OutreachReviewPanel({
   }
 
   const handleApproveAndSend = async () => {
-    // Pipeline reference:
-    // await queueService.sendEmail({ draftId: draft.id, recipient, subject, body });
-    console.log("Sending email via Gmail API...", {
-      draftId: draft.id,
-      senderConnected,
-      connectedEmail,
-      recipient,
-      subject,
-      body,
-    });
+    try {
+      await queueService.sendEmail(draft.id, recipient, subject, body);
 
-    await handleApprove();
+      await handleApprove();
+
+      alert("Email sent successfully!");
+    } catch (err) {
+      console.error(err);
+
+      alert("Failed to send email.");
+    }
   };
 
   return (
@@ -117,13 +128,23 @@ export function OutreachReviewPanel({
         </div>
 
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={onPrev} disabled={total <= 1}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onPrev}
+            disabled={total <= 1}
+          >
             <ChevronLeft className="h-3.5 w-3.5" /> Previous
           </Button>
           <span className="px-1 text-xs text-white/30">
             {index + 1} / {total}
           </span>
-          <Button variant="outline" size="sm" onClick={onNext} disabled={total <= 1}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onNext}
+            disabled={total <= 1}
+          >
             Next <ChevronRight className="h-3.5 w-3.5" />
           </Button>
         </div>
@@ -149,10 +170,10 @@ export function OutreachReviewPanel({
                     draft.status === "approved"
                       ? "success"
                       : draft.status === "rejected"
-                      ? "danger"
-                      : draft.status === "edited"
-                      ? "outline"
-                      : "warning"
+                        ? "danger"
+                        : draft.status === "edited"
+                          ? "outline"
+                          : "warning"
                   }
                 >
                   {draft.status}
@@ -168,7 +189,9 @@ export function OutreachReviewPanel({
                     {senderConnected ? (
                       <div className="mt-1 flex items-center justify-between rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-400">
                         <span>{connectedEmail}</span>
-                        <span className="text-xs font-medium text-emerald-500">Connected</span>
+                        <span className="text-xs font-medium text-emerald-500">
+                          Connected
+                        </span>
                       </div>
                     ) : (
                       <button
@@ -195,7 +218,9 @@ export function OutreachReviewPanel({
                 </div>
 
                 <div className="pt-2">
-                  <p className="text-[10px] uppercase tracking-wider text-white/30">Subject</p>
+                  <p className="text-[10px] uppercase tracking-wider text-white/30">
+                    Subject
+                  </p>
                   <input
                     value={subject}
                     onChange={(e) => setSubject(e.target.value)}
@@ -204,7 +229,9 @@ export function OutreachReviewPanel({
                 </div>
                 <Separator />
                 <div>
-                  <p className="text-[10px] uppercase tracking-wider text-white/30">Message</p>
+                  <p className="text-[10px] uppercase tracking-wider text-white/30">
+                    Message
+                  </p>
                   <textarea
                     rows={12}
                     value={body}
@@ -251,7 +278,11 @@ export function OutreachReviewPanel({
 
             {draft.status === "pending" || draft.status === "edited" ? (
               <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={handleReject} disabled={pendingAction !== null}>
+                <Button
+                  variant="outline"
+                  onClick={handleReject}
+                  disabled={pendingAction !== null}
+                >
                   {pendingAction === "reject" ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
                   ) : (
@@ -260,7 +291,9 @@ export function OutreachReviewPanel({
                   Reject
                 </Button>
                 <Button
-                  disabled={!recipient || !senderConnected || pendingAction !== null}
+                  disabled={
+                    !recipient || !senderConnected || pendingAction !== null
+                  }
                   onClick={handleApproveAndSend}
                 >
                   {pendingAction === "approve" ? (
@@ -273,7 +306,9 @@ export function OutreachReviewPanel({
               </div>
             ) : (
               <p className="text-right text-[11px] text-white/25">
-                {draft.status === "approved" ? "Approved — ready for manual send" : "Rejected"}
+                {draft.status === "approved"
+                  ? "Approved — ready for manual send"
+                  : "Rejected"}
               </p>
             )}
           </div>
@@ -281,9 +316,14 @@ export function OutreachReviewPanel({
           <div className="space-y-4">
             <Card>
               <div className="flex flex-col items-center gap-2 p-5">
-                <ScoreRing score={draft.confidence} size={84} label="confidence" />
+                <ScoreRing
+                  score={draft.confidence}
+                  size={84}
+                  label="confidence"
+                />
                 <p className="text-center text-[11px] text-white/30">
-                  Based on Guardrail-verified claims from this account&apos;s analysis
+                  Based on Guardrail-verified claims from this account&apos;s
+                  analysis
                 </p>
               </div>
             </Card>

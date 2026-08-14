@@ -27,6 +27,12 @@ from app.api.workspace import router as workspace_router
 from app.api.queue import router as queue_router
 from app.api.audit import router as audit_router
 
+from app.database.database import engine
+from app.database.base import Base
+
+from app.models.user import User
+from app.models.connected_account import ConnectedAccount
+
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -90,6 +96,6 @@ async def root():
         "message": "Welcome to ProspectIQ 🚀",
         "version": settings.APP_VERSION,
     }
-
+Base.metadata.create_all(bind=engine)
 
 logger.info("ProspectIQ initialized successfully.")
