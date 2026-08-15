@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_ID: str = ""
     GOOGLE_CLIENT_SECRET: str = ""
     GOOGLE_REDIRECT_URI: str = "https://prospectiq-ijyz.onrender.com/auth/google/callback"
+    FRONTEND_URL: str = "http://localhost:3000"
 
     DATABASE_URL: str
 
