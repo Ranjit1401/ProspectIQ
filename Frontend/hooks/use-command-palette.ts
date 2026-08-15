@@ -7,32 +7,17 @@ export function useCommandPalette() {
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      const key = event.key?.toLowerCase();
-
-      if (key === "k" && (event.metaKey || event.ctrlKey)) {
+      if (event.key.toLowerCase() === "k" && (event.metaKey || event.ctrlKey)) {
         event.preventDefault();
         setOpen((prev) => !prev);
       }
-
-      if (event.key === "Escape") {
-        setOpen(false);
-      }
+      if (event.key === "Escape") setOpen(false);
     };
-
     document.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-    };
+    return () => document.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  const close = useCallback(() => {
-    setOpen(false);
-  }, []);
+  const close = useCallback(() => setOpen(false), []);
 
-  return {
-    open,
-    setOpen,
-    close,
-  };
+  return { open, setOpen, close };
 }

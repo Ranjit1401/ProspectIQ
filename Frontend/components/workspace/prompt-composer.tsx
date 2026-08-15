@@ -228,7 +228,7 @@ export function PromptComposer({ onSend, sending }: PromptComposerProps) {
 
         <textarea
           ref={textareaRef}
-          className="w-full resize-none bg-transparent px-3.5 pb-1 pt-3 text-[14px] leading-relaxed text-white/90 placeholder-white/30 focus:outline-none"
+          className="w-full resize-none bg-transparent px-3.5 pb-1 pt-3 text-[15px] leading-relaxed text-white/90 placeholder-white/30 focus:outline-none"
           rows={2}
           placeholder="Research a company, upload resources, or ask ProspectIQ to generate a sales strategy..."
           value={prompt}
