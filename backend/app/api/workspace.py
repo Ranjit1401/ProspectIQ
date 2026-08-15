@@ -21,6 +21,256 @@ router = APIRouter(
 )
 
 
+INTENT_HIGH_THRESHOLD = 80
+INTENT_MEDIUM_THRESHOLD = 60
+
+
+OUTREACH_PURPOSES = {
+    "sales": {
+        "label": "Sales / Business Opportunity",
+        "focus": "business-value / solution-focused outreach",
+    },
+    "product_demo": {
+        "label": "Product Demo",
+        "focus": "demo / discovery-focused outreach",
+    },
+    "collaboration": {
+        "label": "Collaboration",
+        "focus": "collaboration-focused outreach",
+    },
+    "strategic_partnership": {
+        "label": "Strategic Partnership",
+        "focus": "partnership-focused outreach",
+    },
+    "sponsorship": {
+        "label": "Sponsorship",
+        "focus": "sponsorship-focused outreach",
+    },
+    "event_community": {
+        "label": "Event / Community",
+        "focus": "event/community-focused outreach",
+    },
+    "media_pr": {
+        "label": "Media / PR",
+        "focus": "media/PR-focused outreach",
+    },
+    "decision_maker_intro": {
+        "label": "Decision-Maker Introduction",
+        "focus": "a concise executive introduction",
+    },
+    "followup_nurture": {
+        "label": "Follow-up / Nurture",
+        "focus": "relationship-building follow-up",
+    },
+}
+
+_PURPOSE_EVIDENCE_KEYWORDS = {
+    "collaboration": ["collaborat", "co-build", "joint", "integration partner"],
+    "strategic_partnership": ["partner", "partnership", "alliance"],
+    "sponsorship": ["sponsor", "sponsorship"],
+    "event_community": ["event", "conference", "summit", "community", "meetup"],
+    "media_pr": ["media", "press", "pr ", "publicity", "announcement", "coverage"],
+}
+
+
+def _evidence_text(knowledge: dict, sources: list) -> str:
+    """Concatenates the real extracted text this account already has —
+    never fetches or invents anything new — purely so keyword gating
+    below has something real to check against."""
+    parts = [
+        knowledge.get("industry", "") or "",
+        " ".join(knowledge.get("pain_points") or []),
+        " ".join(knowledge.get("buying_signals") or []),
+        " ".join((s.get("title", "") if isinstance(s, dict) else "") for s in sources),
+    ]
+    return " ".join(parts).lower()
+
+
+def _applicable_purposes(
+    knowledge: dict,
+    persona: dict,
+    decision_maker: str,
+    pain_points: list,
+    buying_signals: list,
+    sources: list,
+) -> list[str]:
+   
+    applicable = []
+    has_any_evidence = bool(pain_points or buying_signals or sources)
+
+    if has_any_evidence:
+        applicable.append("sales")
+    if pain_points or buying_signals:
+        applicable.append("product_demo")
+    if decision_maker:
+        applicable.append("decision_maker_intro")
+    if has_any_evidence:
+        applicable.append("followup_nurture")
+
+    text = _evidence_text(knowledge, sources)
+    for key, keywords in _PURPOSE_EVIDENCE_KEYWORDS.items():
+        if any(kw in text for kw in keywords):
+            applicable.append(key)
+
+    return applicable
+
+
+def _purpose_strategy(
+    purpose_key: str,
+    level: str,
+    company_name: str,
+    decision_maker: str,
+    pain_points: list,
+    buying_signals: list,
+    applicable_purposes: list[str],
+) -> dict:
+   
+    purpose = OUTREACH_PURPOSES.get(purpose_key)
+
+    if purpose is None:
+        return {
+            "purpose": purpose_key,
+            "insufficient_evidence": True,
+            "message": "Unknown outreach purpose.",
+        }
+
+    if purpose_key not in applicable_purposes:
+        return {
+            "purpose": purpose_key,
+            "purpose_label": purpose["label"],
+            "insufficient_evidence": True,
+            "message": "Insufficient evidence for this outreach type.",
+        }
+
+    if level == "HIGH":
+        posture = "Direct, personalized"
+        grounding = f"to {decision_maker}" if decision_maker else "to the identified stakeholder"
+    elif level == "MEDIUM":
+        posture = "Evidence-first, discovery-oriented"
+        grounding = "opening a conversation before pitching"
+    else:
+        posture = "Soft, low-pressure"
+        grounding = "a light-touch signal rather than a pitch"
+
+    name = f"{posture} {purpose['label'].lower()} outreach"
+    description = f"{posture} {purpose['focus']} for {company_name}, {grounding}."
+
+    return {
+        "purpose": purpose_key,
+        "purpose_label": purpose["label"],
+        "insufficient_evidence": False,
+        "name": name,
+        "description": description,
+    }
+
+STRATEGY_OPTIONS_BY_LEVEL = {
+    "HIGH": [
+        {
+            "key": "direct",
+            "name": "Direct Outreach",
+            "description": "Reach out now with a direct, tailored pitch — intent signals are strong enough to skip discovery.",
+        },
+        {
+            "key": "executive",
+            "name": "Executive / Decision-Maker Outreach",
+            "description": "Go straight to the identified decision-maker with an executive-level message.",
+        },
+        {
+            "key": "pain_point",
+            "name": "Pain-Point Outreach",
+            "description": "Lead with the specific pain point(s) evidence shows this account is facing.",
+        },
+    ],
+    "MEDIUM": [
+        {
+            "key": "discovery",
+            "name": "Discovery Outreach",
+            "description": "Open a conversation to learn more before pitching — intent is real but not yet fully formed.",
+        },
+        {
+            "key": "nurture",
+            "name": "Nurture Outreach",
+            "description": "Share relevant insight or content to build trust while intent develops further.",
+        },
+        {
+            "key": "evidence_first",
+            "name": "Evidence-First Outreach",
+            "description": "Lead with the specific evidence found (news, hiring, product signals) rather than a pitch.",
+        },
+    ],
+    "LOW": [
+        {
+            "key": "monitor",
+            "name": "Monitor",
+            "description": "No strong buying signals yet — track this account for changes rather than reaching out.",
+        },
+        {
+            "key": "soft_awareness",
+            "name": "Soft Awareness",
+            "description": "A light-touch, non-salesy touchpoint to stay on the account's radar.",
+        },
+        {
+            "key": "wait",
+            "name": "Wait for Signal",
+            "description": "Hold off on outreach entirely until a stronger buying signal appears.",
+        },
+    ],
+}
+
+
+def _intent_level(intent_score: int | float) -> str:
+    """Maps the EXISTING Intent Agent score to HIGH/MEDIUM/LOW. No new score."""
+    score = intent_score or 0
+    if score >= INTENT_HIGH_THRESHOLD:
+        return "HIGH"
+    if score >= INTENT_MEDIUM_THRESHOLD:
+        return "MEDIUM"
+    return "LOW"
+
+
+def _select_strategy_key(
+    level: str,
+    knowledge: dict,
+    persona: dict,
+) -> str:
+    """
+    Picks which of the tier's strategy options best fits this specific
+    account, based only on real, already-extracted fields — never
+    invents a new field to decide on.
+    """
+    decision_maker = knowledge.get("decision_makers") or persona.get("primary_decision_maker")
+    pain_points = knowledge.get("pain_points") or []
+    buying_signals = knowledge.get("buying_signals") or []
+    sources = knowledge.get("sources") or []
+
+    if level == "HIGH":
+        if decision_maker:
+            return "executive"
+        if pain_points:
+            return "pain_point"
+        return "direct"
+
+    if level == "MEDIUM":
+        if len(sources) >= 2 or len(pain_points) >= 1:
+            return "evidence_first"
+        if buying_signals:
+            return "discovery"
+        return "nurture"
+
+    # LOW
+    if not buying_signals and not pain_points:
+        return "wait"
+    return "soft_awareness" if len(buying_signals) < 2 else "monitor"
+
+
+def _strategy_options_for(level: str, selected_key: str) -> list[dict]:
+    options = STRATEGY_OPTIONS_BY_LEVEL.get(level, [])
+    return [
+        {**opt, "recommended": opt["key"] == selected_key}
+        for opt in options
+    ]
+
+
 @router.get("/")
 async def workspace(
     current_user: User = Depends(get_current_user),
@@ -63,8 +313,6 @@ async def workspace(
 
         total = len(analyses)
 
-        # analyses_by_company lists are already sorted ascending by
-        # created_at (from the query above), so the last one is latest.
         latest = analyses[-1]
 
         response.append(
@@ -120,8 +368,7 @@ async def workspace_stats(
     week_ago = now - timedelta(days=7)
     two_weeks_ago = now - timedelta(days=14)
 
-    # Latest + first analysis per company (analyses are sorted ascending,
-    # so the last write for a company_id in the loop is always its latest).
+   
     latest_by_company: dict[int, AnalysisResult] = {}
     first_created_by_company: dict[int, datetime] = {}
 
@@ -129,7 +376,6 @@ async def workspace_stats(
         latest_by_company[analysis.company_id] = analysis
         first_created_by_company.setdefault(analysis.company_id, analysis.created_at)
 
-    # ---- Stat cards ----
     total_accounts = len(companies)
     new_accounts_this_week = sum(
         1 for created in first_created_by_company.values() if created >= week_ago
@@ -167,16 +413,12 @@ async def workspace_stats(
         if not a.guardrail.get("approved", True) and a.created_at >= week_ago
     )
 
-    # ---- Per-company breakdown for the charts (status, pain points,
-    # trust buckets) — pulls each company's latest extracted knowledge. ----
+  
     status_counts = {"analyzed": 0, "in-review": 0, "queued": 0}
     industry_pain_counts: dict[str, int] = defaultdict(int)
     trust_buckets = {"0-20": 0, "21-40": 0, "41-60": 0, "61-80": 0, "81-100": 0}
     stakeholders_mapped = 0
 
-    # Single bulk query for every knowledge source we'll need, instead of
-    # one query per company (N+1) — this was the main cause of the slow
-    # page load, since each extra query is a full DB round trip.
     needed_knowledge_ids = {
         latest_by_company[c.id].knowledge_id
         for c in companies
@@ -226,7 +468,6 @@ async def workspace_stats(
             contacts = knowledge.get("decision_makers", []) or []
         stakeholders_mapped += len(contacts)
 
-    # ---- Research activity: analyses per day over the last 14 days ----
     activity_by_day: dict[str, int] = defaultdict(int)
     for analysis in all_analyses:
         activity_by_day[analysis.created_at.date().isoformat()] += 1
@@ -608,6 +849,7 @@ async def company_dashboard(
 @router.get("/recommendations")
 async def recommendations(
     company_id: int | None = None,
+    purpose: str | None = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -621,15 +863,21 @@ async def recommendations(
 
     analyses = query.order_by(AnalysisResult.created_at.asc()).all()
 
-    # One recommendation per company, built from that company's most
-    # recent analysis (analyses are sorted ascending above, so the last
-    # write per company_id in this loop is always the latest one) —
-    # mirrors the "current state of the account" convention used by
-    # company_dashboard() and workspace_stats() elsewhere in this file,
-    # instead of surfacing every historical analysis as a separate card.
     latest_by_company: dict[int, AnalysisResult] = {}
     for analysis in analyses:
         latest_by_company[analysis.company_id] = analysis
+
+    needed_knowledge_ids = {a.knowledge_id for a in latest_by_company.values()}
+    knowledge_by_id: dict[int, dict] = {}
+    if needed_knowledge_ids:
+        knowledge_sources = (
+            db.query(KnowledgeSource)
+            .filter(KnowledgeSource.id.in_(needed_knowledge_ids))
+            .all()
+        )
+        knowledge_by_id = {
+            ks.id: (ks.processed_data.get("knowledge", {}) or {}) for ks in knowledge_sources
+        }
 
     recommendations = []
 
@@ -640,41 +888,108 @@ async def recommendations(
         if company is None:
             continue
 
+        knowledge = knowledge_by_id.get(analysis.knowledge_id, {}) or {}
+        persona = analysis.persona or {}
+        guardrail = analysis.guardrail or {}
+        strategy = analysis.strategy or {}
+
         score = 0
 
         reasons = []
 
-        intent = analysis.intent.get(
+        intent_score = analysis.intent.get(
             "intent_score",
             0,
         )
 
-        score += intent
+        score += intent_score
 
         if analysis.intent.get("priority") == "High":
             score += 10
             reasons.append("High priority account")
 
-        if analysis.persona.get(
-            "primary_decision_maker",
-            ""
-        ):
+        decision_maker = persona.get("primary_decision_maker", "")
+
+        if decision_maker:
             score += 5
             reasons.append("Decision maker identified")
 
-        if analysis.guardrail.get(
+        if guardrail.get(
             "risk_level",
             ""
         ).lower() == "low":
             score += 5
             reasons.append("Low execution risk")
 
-        if analysis.strategy.get(
+        if strategy.get(
             "next_best_action",
             ""
         ):
             score += 5
             reasons.append("Clear next action available")
+
+        # =====================================================
+        # Intent-driven outreach strategy
+        #
+        # The tier (HIGH/MEDIUM/LOW) and the recommended strategy
+        # option come only from the EXISTING intent_score plus real,
+        # already-extracted account fields — nothing new is scored or
+        # invented here.
+        # =====================================================
+        level = _intent_level(intent_score)
+        selected_key = _select_strategy_key(level, knowledge, persona)
+        strategy_options = _strategy_options_for(level, selected_key)
+        recommended_option = next(
+            (opt for opt in strategy_options if opt["recommended"]),
+            strategy_options[0] if strategy_options else None,
+        )
+
+        pain_points = knowledge.get("pain_points") or []
+        buying_signals = knowledge.get("buying_signals") or []
+        sources = knowledge.get("sources") or []
+        knowledge_confidence = knowledge.get("confidence", 0) or 0
+
+        # Evidence is "insufficient" when there's essentially nothing
+        # grounding this account beyond the bare intent score — the UI
+        # should say so plainly instead of implying a rich evidence base.
+        evidence_sufficient = bool(sources or pain_points or buying_signals)
+
+        applicable_purposes = _applicable_purposes(
+            knowledge,
+            persona,
+            decision_maker,
+            pain_points,
+            buying_signals,
+            sources,
+        )
+
+        purpose_strategy = None
+        if purpose:
+            purpose_strategy = _purpose_strategy(
+                purpose,
+                level,
+                company.name,
+                decision_maker,
+                pain_points,
+                buying_signals,
+                applicable_purposes,
+            )
+
+        why_parts = [f"{company.name} scored {intent_score}/100 intent ({level})."]
+
+        if decision_maker:
+            why_parts.append(f"A named decision-maker ({decision_maker}) was identified.")
+        if pain_points:
+            why_parts.append(f"{len(pain_points)} pain point(s) were extracted from real evidence.")
+        if buying_signals:
+            why_parts.append(f"{len(buying_signals)} buying signal(s) were detected.")
+        if sources:
+            why_parts.append(f"Grounded in {len(sources)} real source(s) from research.")
+        if not evidence_sufficient:
+            why_parts.append(
+                "Limited supporting evidence is available for this account — "
+                "this recommendation reflects the intent score alone."
+            )
 
         recommendations.append(
             {
@@ -688,28 +1003,40 @@ async def recommendations(
                     "priority",
                     "",
                 ),
-                "intent": intent,
+                "intent": intent_score,
+                "intent_score": intent_score,
+                "intent_level": level,
                 "buying_stage": analysis.intent.get(
                     "buying_stage",
                     "",
                 ),
-                "risk_level": analysis.guardrail.get(
+                "risk_level": guardrail.get(
                     "risk_level",
                     "",
                 ),
-                "decision_maker": analysis.persona.get(
-                    "primary_decision_maker",
-                    "",
-                ),
-                "confidence": analysis.guardrail.get(
+                "decision_maker": decision_maker,
+                "confidence": guardrail.get(
                     "confidence",
                     0,
                 ),
-                "next_action": analysis.strategy.get(
+                "knowledge_confidence": knowledge_confidence,
+                "next_action": strategy.get(
                     "next_best_action",
                     "",
                 ),
                 "reason": reasons,
+                "why_this_recommendation": " ".join(why_parts),
+                "strategy_options": strategy_options,
+                "recommended_strategy": recommended_option,
+                "pain_points": pain_points,
+                "buying_signals": buying_signals,
+                "evidence": sources,
+                "evidence_sufficient": evidence_sufficient,
+                "available_purposes": [
+                    {"key": key, "label": OUTREACH_PURPOSES[key]["label"]}
+                    for key in applicable_purposes
+                ],
+                "purpose_strategy": purpose_strategy,
                 "created_at": analysis.created_at,
             }
         )
@@ -948,20 +1275,27 @@ async def company_activity(
     }
 
 
-# =========================================================
-# Stakeholders / Pain Points / Buying Signals / Graph
-#
-# These derive from the raw extracted knowledge (contacts,
-# decision_makers, pain_points, buying_signals) attached to a company's
-# most recent analysis, rather than a separate table — the knowledge
-# extraction agent already produces this data, it just wasn't exposed
-# yet.
-# =========================================================
 
 
 def _slugify(value: str) -> str:
     slug = re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
     return slug or "unknown"
+
+def _source_labels(sources) -> list[str]:
+   
+    labels = []
+    for s in sources or []:
+        if isinstance(s, dict):
+            title = s.get("title") or ""
+            url = s.get("url") or ""
+            if title and url:
+                labels.append(f"{title} ({url})")
+            else:
+                labels.append(title or url)
+        elif isinstance(s, str) and s:
+            labels.append(s)
+    return labels
+
 
 def _to_text(value) -> str:
     """
@@ -1061,9 +1395,6 @@ async def company_stakeholders(
     buying_signals = knowledge.get("buying_signals", []) or []
     confidence = knowledge.get("confidence", 0) or 0
 
-    # Fall back to the plain decision_makers list if no structured
-    # contacts were extracted, so the screen isn't empty just because
-    # the source text didn't include emails/phone numbers.
     if not contacts:
         contacts = [
             {"name": _to_text(name), "role": "", "email": "", "phone": ""}
@@ -1087,7 +1418,7 @@ async def company_stakeholders(
                 "linkedin": False,
                 "email": contact.get("email", "") or "",
                 "companyId": str(company_id),
-                "evidence": knowledge.get("sources", []) or [],
+                "evidence": _source_labels(knowledge.get("sources", [])),
                 "painPoints": pain_points,
                 "buyingSignals": buying_signals,
             }
@@ -1207,7 +1538,7 @@ async def company_graph(
                 "title": role or "Unknown role",
                 "influence": influence,
                 "confidence": confidence,
-                "evidence": knowledge.get("sources", []) or [],
+                "evidence": _source_labels(knowledge.get("sources", [])),
                 "painPoints": pain_points,
                 "buyingSignals": buying_signals,
             }

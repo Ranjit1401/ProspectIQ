@@ -18,7 +18,6 @@ from app.models.connected_account import ConnectedAccount
 from app.models.user import User
 from app.schemas.user import UserCreate, UserLogin, UserResponse
 from app.services.auth_service import AuthService
-from fastapi.responses import RedirectResponse
 
 router = APIRouter(
     prefix="/auth",
@@ -174,6 +173,7 @@ def verify_oauth_state(state: str) -> int:
 
 
 def create_google_flow(code_verifier: str | None = None):
+    print("DEBUG REDIRECT_URI:", repr(settings.GOOGLE_REDIRECT_URI))
     client_config = {
         "web": {
             "client_id": settings.GOOGLE_CLIENT_ID,
@@ -363,9 +363,12 @@ def google_callback(
         # --------------------------------------------------
         # 10. Success
         # --------------------------------------------------
-        return RedirectResponse(
-            f"{settings.FRONTEND_URL}/queue?gmail=connected"
-        )
+        return {
+            "success": True,
+            "message": "Gmail connected successfully",
+            "email": google_email,
+            "user_id": prospectiq_user_id,
+        }
 
     except HTTPException:
         raise
