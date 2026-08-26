@@ -1,7 +1,7 @@
 from collections import defaultdict
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
@@ -13,12 +13,15 @@ from app.models.company import Company
 from app.models.user import User
 from statistics import mean
 from app.models.knowledge_source import KnowledgeSource
+from app.services.company_service import CompanyService
 import re
 
 router = APIRouter(
     prefix="/workspace",
     tags=["Workspace"],
 )
+
+company_service = CompanyService()
 
 
 INTENT_HIGH_THRESHOLD = 80
@@ -568,6 +571,38 @@ async def company_details(
             "industry": company.industry,
         },
         "analyses": response,
+    }
+
+
+@router.delete("/company/{company_id}")
+async def delete_company_research(
+    company_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Deletes all of this user's research on a company: every analysis,
+    every outreach draft tied to it, and the underlying knowledge
+    extracted for those analyses. If no other user has research on the
+    same Company row, the company record itself is removed too.
+    """
+
+    deleted = company_service.delete_research(
+        db,
+        current_user.id,
+        company_id,
+    )
+
+    if not deleted:
+        raise HTTPException(
+            status_code=404,
+            detail="No research found for this company",
+        )
+
+    return {
+        "success": True,
+        "message": "Company research deleted",
+        "company_id": company_id,
     }
 
 
@@ -1407,6 +1442,8 @@ async def company_stakeholders(
         name = _to_text(contact.get("name", "")) or "Unknown"
         role = _to_text(contact.get("role", ""))
 
+        linkedin_url = contact.get("linkedin_url", "") or ""
+
         stakeholders.append(
             {
                 "id": _slugify(f"{company_id}-{name}"),
@@ -1415,7 +1452,8 @@ async def company_stakeholders(
                 "dept": role.split(" ")[0] if role else "General",
                 "influence": _infer_influence(name, role, primary_decision_maker),
                 "score": confidence,
-                "linkedin": False,
+                "linkedin": bool(linkedin_url),
+                "linkedinUrl": linkedin_url,
                 "email": contact.get("email", "") or "",
                 "companyId": str(company_id),
                 "evidence": _source_labels(knowledge.get("sources", [])),

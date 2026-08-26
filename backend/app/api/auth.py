@@ -1,11 +1,11 @@
 import base64
-from datetime import datetime, timezone
 import hashlib
 import hmac
 import secrets
-import traceback
+from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import RedirectResponse
 from google.auth.transport import requests
 from google.oauth2 import id_token
 from google_auth_oauthlib.flow import Flow
@@ -15,10 +15,17 @@ from app.auth.dependencies import get_current_user
 from app.core.config import settings
 from app.database.session import get_db
 from app.models.connected_account import ConnectedAccount
+from app.models.oauth_state import OAuthState
+
 from app.models.user import User
-from app.schemas.user import UserCreate, UserLogin, UserResponse
+from app.schemas.user import (
+    GoogleLogin,
+    UserCreate,
+    UserLogin,
+    UserResponse,
+)
 from app.services.auth_service import AuthService
-from fastapi.responses import RedirectResponse
+
 
 router = APIRouter(
     prefix="/auth",
@@ -29,8 +36,22 @@ service = AuthService()
 
 
 # ============================================================
+# Google OAuth Configuration
+# ============================================================
+
+GOOGLE_SCOPES = [
+    "openid",
+    "https://www.googleapis.com/auth/userinfo.email",
+    "https://www.googleapis.com/auth/gmail.send",
+]
+
+OAUTH_STATE_EXPIRY_MINUTES = 10
+
+
+# ============================================================
 # Existing Authentication
 # ============================================================
+
 
 @router.post("/register", response_model=UserResponse)
 def register(
@@ -39,6 +60,7 @@ def register(
 ):
     try:
         return service.register(db, user)
+
     except ValueError as e:
         raise HTTPException(
             status_code=400,
@@ -53,6 +75,7 @@ def login(
 ):
     try:
         return service.login(db, user)
+
     except ValueError as e:
         raise HTTPException(
             status_code=401,
@@ -68,28 +91,20 @@ def me(
 
 
 # ============================================================
-# Google OAuth Configuration & PKCE Utilities
+# PKCE Utilities
 # ============================================================
-
-GOOGLE_SCOPES = [
-    "openid",
-    "https://www.googleapis.com/auth/userinfo.email",
-    "https://www.googleapis.com/auth/gmail.send",
-]
-
-# Temporary PKCE storage.
-# Fine for local/hackathon development.
-# Later we can move this to Redis/database for production.
-PKCE_STORE: dict[str, str] = {}
 
 
 def generate_pkce():
     """
-    Generate PKCE code verifier and code challenge.
+    Generate PKCE code verifier and S256 code challenge.
     """
+
     code_verifier = secrets.token_urlsafe(64)
 
-    digest = hashlib.sha256(code_verifier.encode("ascii")).digest()
+    digest = hashlib.sha256(
+        code_verifier.encode("ascii")
+    ).digest()
 
     code_challenge = (
         base64.urlsafe_b64encode(digest)
@@ -100,87 +115,38 @@ def generate_pkce():
     return code_verifier, code_challenge
 
 
-def create_oauth_state(user_id: int) -> str:
-    user_id_str = str(user_id)
-
-    secret = settings.JWT_SECRET_KEY.encode()
-
-    timestamp = str(int(datetime.now(timezone.utc).timestamp()))
-
-    nonce = secrets.token_urlsafe(32)
-
-    payload = f"{user_id_str}:{timestamp}:{nonce}"
-
-    signature = hmac.new(
-        secret,
-        payload.encode(),
-        hashlib.sha256,
-    ).hexdigest()
-
-    return f"{payload}:{signature}"
+# ============================================================
+# OAuth State Utilities
+# ============================================================
 
 
-def verify_oauth_state(state: str) -> int:
-    try:
-        parts = state.split(":")
+def generate_oauth_state() -> str:
+    """
+    Generate an opaque random OAuth state value.
 
-        if len(parts) != 4:
-            raise HTTPException(
-                status_code=400,
-                detail="Invalid OAuth state",
-            )
+    The actual user ID and PKCE verifier are stored in the
+    database rather than being exposed inside the state value.
+    """
 
-        user_id_str, timestamp, nonce, signature = parts
-
-        secret = settings.JWT_SECRET_KEY.encode()
-
-        payload = f"{user_id_str}:{timestamp}:{nonce}"
-
-        expected_signature = hmac.new(
-            secret,
-            payload.encode(),
-            hashlib.sha256,
-        ).hexdigest()
-
-        if not secrets.compare_digest(
-            signature,
-            expected_signature,
-        ):
-            raise HTTPException(
-                status_code=400,
-                detail="Invalid OAuth state signature",
-            )
-
-        # 10 minute expiry
-        created_at = int(timestamp)
-
-        now = int(
-            datetime.now(timezone.utc).timestamp()
-        )
-
-        if now - created_at > 600:
-            raise HTTPException(
-                status_code=400,
-                detail="OAuth state expired",
-            )
-
-        return int(user_id_str)
-
-    except ValueError:
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid OAuth state",
-        )
+    return secrets.token_urlsafe(48)
 
 
-def create_google_flow(code_verifier: str | None = None):
+def create_google_flow(
+    code_verifier: str | None = None,
+):
+    """
+    Create Google OAuth Flow.
+    """
+
     client_config = {
         "web": {
             "client_id": settings.GOOGLE_CLIENT_ID,
             "client_secret": settings.GOOGLE_CLIENT_SECRET,
             "auth_uri": "https://accounts.google.com/o/oauth2/auth",
             "token_uri": "https://oauth2.googleapis.com/token",
-            "redirect_uris": [settings.GOOGLE_REDIRECT_URI],
+            "redirect_uris": [
+                settings.GOOGLE_REDIRECT_URI
+            ],
         }
     }
 
@@ -197,44 +163,94 @@ def create_google_flow(code_verifier: str | None = None):
 
 
 # ============================================================
-# Google Login
+# Google Connect
 # ============================================================
 
-@router.get("/google/login")
-def google_login(
+
+@router.get("/google/connect")
+def google_connect(
     current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     """
-    Start Google OAuth with PKCE.
+    Start Google OAuth connection for the currently
+    authenticated ProspectIQ user.
     """
-    code_verifier, code_challenge = generate_pkce()
 
-    flow = create_google_flow(
-        code_verifier=code_verifier
-    )
+    try:
+        # ----------------------------------------------------
+        # 1. Generate PKCE
+        # ----------------------------------------------------
 
-    state = create_oauth_state(current_user.id)
+        code_verifier, code_challenge = generate_pkce()
 
-    PKCE_STORE[state] = code_verifier
+        # ----------------------------------------------------
+        # 2. Generate opaque state
+        # ----------------------------------------------------
 
-    authorization_url, _ = flow.authorization_url(
-        access_type="offline",
-        include_granted_scopes="true",
-        prompt="consent",
-        state=state,
-        code_challenge=code_challenge,
-        code_challenge_method="S256",
-    )
+        state = generate_oauth_state()
 
-    return {
-        "authorization_url": authorization_url,
-        "state": state,
-    }
+        # ----------------------------------------------------
+        # 3. Calculate expiration
+        # ----------------------------------------------------
+
+        expires_at = (
+            datetime.now(timezone.utc)
+            + timedelta(minutes=OAUTH_STATE_EXPIRY_MINUTES)
+        )
+
+        # ----------------------------------------------------
+        # 4. Store OAuth state + PKCE verifier
+        # ----------------------------------------------------
+
+        oauth_state = OAuthState(
+            state=state,
+            user_id=current_user.id,
+            code_verifier=code_verifier,
+            expires_at=expires_at,
+        )
+
+        db.add(oauth_state)
+        db.commit()
+
+        # ----------------------------------------------------
+        # 5. Create Google OAuth flow
+        # ----------------------------------------------------
+
+        flow = create_google_flow(
+            code_verifier=code_verifier
+        )
+
+        # ----------------------------------------------------
+        # 6. Generate Google authorization URL
+        # ----------------------------------------------------
+
+        authorization_url, _ = flow.authorization_url(
+            access_type="offline",
+            include_granted_scopes="true",
+            prompt="consent",
+            state=state,
+            code_challenge=code_challenge,
+            code_challenge_method="S256",
+        )
+
+        return {
+            "authorization_url": authorization_url,
+        }
+
+    except Exception as e:
+        db.rollback()
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to start Google OAuth: {str(e)}",
+        )
 
 
 # ============================================================
 # Google Callback
 # ============================================================
+
 
 @router.get("/google/callback")
 def google_callback(
@@ -243,106 +259,267 @@ def google_callback(
     db: Session = Depends(get_db),
 ):
     """
-    Google OAuth callback with PKCE verification.
+    Google OAuth callback.
+
+    Flow:
+
+    Google
+       ↓
+    state validation
+       ↓
+    retrieve PKCE verifier
+       ↓
+    exchange authorization code
+       ↓
+    verify Google identity
+       ↓
+    create/update ConnectedAccount
     """
+
     try:
-        # --------------------------------------------------
-        # 1. Verify OAuth state
-        # --------------------------------------------------
-        prospectiq_user_id = verify_oauth_state(state)
 
-        # --------------------------------------------------
-        # 2. Get original PKCE verifier
-        # --------------------------------------------------
-        code_verifier = PKCE_STORE.pop(state, None)
+        # ====================================================
+        # 1. Retrieve OAuth state
+        # ====================================================
 
-        if not code_verifier:
+        oauth_state = (
+            db.query(OAuthState)
+            .filter(
+                OAuthState.state == state
+            )
+            .first()
+        )
+
+        if not oauth_state:
             raise HTTPException(
                 status_code=400,
-                detail=(
-                    "PKCE code verifier not found. "
-                    "Please restart Google connection."
-                ),
+                detail="Invalid or expired OAuth state",
             )
 
-        # --------------------------------------------------
-        # 3. Verify ProspectIQ user
-        # --------------------------------------------------
+        # ====================================================
+        # 2. Check expiration
+        # ====================================================
+
+        now = datetime.now(timezone.utc)
+
+        expires_at = oauth_state.expires_at
+
+        # Handle databases returning naive datetime
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(
+                tzinfo=timezone.utc
+            )
+
+        if now > expires_at:
+
+            db.delete(oauth_state)
+            db.commit()
+
+            raise HTTPException(
+                status_code=400,
+                detail="OAuth state expired. Please reconnect Google.",
+            )
+
+        # ====================================================
+        # 3. Retrieve ProspectIQ user
+        # ====================================================
+
+        prospectiq_user_id = oauth_state.user_id
+
         user = (
             db.query(User)
-            .filter(User.id == prospectiq_user_id)
+            .filter(
+                User.id == prospectiq_user_id
+            )
             .first()
         )
 
         if not user:
+
+            db.delete(oauth_state)
+            db.commit()
+
             raise HTTPException(
                 status_code=404,
                 detail="ProspectIQ user not found",
             )
 
-        # --------------------------------------------------
-        # 4. Create Google OAuth flow
-        # --------------------------------------------------
+        # ====================================================
+        # 4. Retrieve PKCE verifier
+        # ====================================================
+
+        code_verifier = oauth_state.code_verifier
+
+        if not code_verifier:
+
+            db.delete(oauth_state)
+            db.commit()
+
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "PKCE verifier not found. "
+                    "Please restart Google connection."
+                ),
+            )
+
+        # ====================================================
+        # 5. Delete OAuth state immediately
+        #
+        # This prevents replay attacks.
+        # ====================================================
+
+        db.delete(oauth_state)
+        db.commit()
+
+        # ====================================================
+        # 6. Create OAuth flow
+        # ====================================================
+
         flow = create_google_flow(
             code_verifier=code_verifier
         )
 
-        # --------------------------------------------------
-        # 5. Exchange authorization code
-        # --------------------------------------------------
+        # ====================================================
+        # 7. Exchange authorization code
+        # ====================================================
+
         flow.fetch_token(
-            code=code,
+            code=code
         )
 
         credentials = flow.credentials
 
-        # --------------------------------------------------
-        # 6. Extract email from Google ID token
-        # --------------------------------------------------
+        # ====================================================
+        # 8. Make sure ID token exists
+        # ====================================================
+
+        if not credentials.id_token:
+            raise HTTPException(
+                status_code=400,
+                detail="Google did not return an ID token",
+            )
+
+        # ====================================================
+        # 9. Verify Google ID token
+        # ====================================================
+
         request = requests.Request()
+
         id_info = id_token.verify_oauth2_token(
             credentials.id_token,
             request,
             settings.GOOGLE_CLIENT_ID,
         )
-        google_email = id_info["email"]
 
-        # --------------------------------------------------
-        # 7. Find existing connection
-        # --------------------------------------------------
+        # ====================================================
+        # 10. Validate issuer
+        # ====================================================
+
+        issuer = id_info.get("iss")
+
+        if issuer not in [
+            "accounts.google.com",
+            "https://accounts.google.com",
+        ]:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid Google token issuer",
+            )
+
+        # ====================================================
+        # 11. Validate email
+        # ====================================================
+
+        google_email = id_info.get("email")
+
+        if not google_email:
+            raise HTTPException(
+                status_code=400,
+                detail="Google account email not found",
+            )
+
+        # ====================================================
+        # 12. Validate email verification
+        # ====================================================
+
+        email_verified = id_info.get(
+            "email_verified"
+        )
+
+        if email_verified is not True:
+            raise HTTPException(
+                status_code=400,
+                detail="Google email is not verified",
+            )
+
+        # ====================================================
+        # 13. Get Google account ID
+        # ====================================================
+
+        google_subject = id_info.get("sub")
+
+        if not google_subject:
+            raise HTTPException(
+                status_code=400,
+                detail="Google account ID not found",
+            )
+
+        # ====================================================
+        # 14. Find existing Google connection
+        # ====================================================
+
         account = (
             db.query(ConnectedAccount)
             .filter(
-                ConnectedAccount.user_id == prospectiq_user_id,
-                ConnectedAccount.provider == "google",
+                ConnectedAccount.user_id
+                == prospectiq_user_id,
+                ConnectedAccount.provider
+                == "google",
             )
             .first()
         )
 
-        # --------------------------------------------------
-        # 8. Update existing Gmail connection
-        # --------------------------------------------------
+        # ====================================================
+        # 15. Update existing account
+        # ====================================================
+
         if account:
+
             account.email = google_email
+
             account.access_token = credentials.token
 
+            # Google may NOT return a refresh token
+            # during subsequent authorizations.
             if credentials.refresh_token:
-                account.refresh_token = credentials.refresh_token
+                account.refresh_token = (
+                    credentials.refresh_token
+                )
 
             account.token_expiry = credentials.expiry
-            account.updated_at = datetime.now(timezone.utc)
 
-        # --------------------------------------------------
-        # 9. Create new Gmail connection
-        # --------------------------------------------------
+            # Store Google subject if your model supports it.
+            if hasattr(account, "provider_account_id"):
+                account.provider_account_id = google_subject
+
+            account.updated_at = datetime.now(
+                timezone.utc
+            )
+
+        # ====================================================
+        # 16. Create new account
+        # ====================================================
+
         else:
+
             if not credentials.refresh_token:
                 raise HTTPException(
                     status_code=400,
                     detail=(
                         "Google did not return a refresh token. "
-                        "Please revoke the existing Google permission "
-                        "and connect again."
+                        "Please revoke the existing Google "
+                        "permission and connect again."
                     ),
                 )
 
@@ -355,49 +532,76 @@ def google_callback(
                 token_expiry=credentials.expiry,
             )
 
+            if hasattr(account, "provider_account_id"):
+                account.provider_account_id = google_subject
+
             db.add(account)
+
+        # ====================================================
+        # 17. Save account
+        # ====================================================
 
         db.commit()
         db.refresh(account)
 
-        # --------------------------------------------------
-        # 10. Success
-        # --------------------------------------------------
+       # ====================================================
+        # 18. Success — redirect back into the frontend app
+        # ====================================================
+
         return RedirectResponse(
-            f"{settings.FRONTEND_URL}/queue?gmail=connected"
+            url=f"{settings.FRONTEND_URL}/queue?gmail_connected=true"
         )
 
-    except HTTPException:
-        raise
+    except HTTPException as e:
+
+        return RedirectResponse(
+            url=(
+                f"{settings.FRONTEND_URL}/queue"
+                f"?gmail_error={e.detail}"
+            )
+        )
 
     except Exception as e:
 
         db.rollback()
 
-        print("\n\n========== GOOGLE OAUTH ERROR ==========")
-        traceback.print_exc()
-        print("========================================\n\n")
-
-        raise HTTPException(
-            status_code=500,
-            detail=str(e),
+        print(
+            "\n========== GOOGLE OAUTH ERROR =========="
+        )
+        print(str(e))
+        print(
+            "========================================\n"
         )
 
+        return RedirectResponse(
+            url=(
+                f"{settings.FRONTEND_URL}/queue"
+                f"?gmail_error=connection_failed"
+            )
+        )
 
 # ============================================================
 # Gmail Status
 # ============================================================
+
 
 @router.get("/google/status")
 def google_status(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    """
+    Check whether the current ProspectIQ user
+    has connected a Google account.
+    """
+
     account = (
         db.query(ConnectedAccount)
         .filter(
-            ConnectedAccount.user_id == current_user.id,
-            ConnectedAccount.provider == "google",
+            ConnectedAccount.user_id
+            == current_user.id,
+            ConnectedAccount.provider
+            == "google",
         )
         .first()
     )
@@ -412,3 +616,67 @@ def google_status(
         "connected": True,
         "email": account.email,
     }
+
+
+# ============================================================
+# Gmail Disconnect
+# ============================================================
+
+
+@router.post("/google/disconnect")
+def google_disconnect(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Disconnect Google/Gmail account from ProspectIQ.
+    """
+
+    account = (
+        db.query(ConnectedAccount)
+        .filter(
+            ConnectedAccount.user_id
+            == current_user.id,
+            ConnectedAccount.provider
+            == "google",
+        )
+        .first()
+    )
+
+    if account is None:
+        return {
+            "connected": False,
+            "email": None,
+        }
+
+    db.delete(account)
+    db.commit()
+
+    return {
+        "connected": False,
+        "email": None,
+    }
+
+
+# ============================================================
+# Existing Google Login
+# ============================================================
+
+
+@router.post("/google-auth")
+def google_auth(
+    user: GoogleLogin,
+    db: Session = Depends(get_db),
+):
+    """
+    Existing Google authentication endpoint.
+
+    This is kept separate from /google/connect because
+    /google-auth is for ProspectIQ login while
+    /google/connect is for connecting Gmail.
+    """
+
+    return service.google_login(
+        db,
+        user,
+    )

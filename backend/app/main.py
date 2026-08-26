@@ -32,6 +32,7 @@ from app.database.base import Base
 
 from app.models.user import User
 from app.models.connected_account import ConnectedAccount
+from app.api.enrichment import router as enrichment_router
 
 
 app = FastAPI(
@@ -48,10 +49,11 @@ origins = [
     "http://127.0.0.1:3000",
 
     # Vercel Frontend
-    "https://prospect-iq-oobr.vercel.app",
+    "https://sales-agent-ai-jet.vercel.app",
 
     # Preview deployments
-    "https://prospect-iq-oobr-git-main-ranjit-bhardwaj-s-projects.vercel.app",
+    "https://sales-agent-csgz0v8qi-gaurav88s-projects.vercel.app/",
+    "https://sales-agent-ai-git-main-gaurav88s-projects.vercel.app",
 ]
 
 app.add_middleware(
@@ -88,6 +90,7 @@ app.include_router(website_router)
 app.include_router(workspace_router)
 app.include_router(queue_router)
 app.include_router(audit_router)
+app.include_router(enrichment_router)
 
 
 @app.get("/")

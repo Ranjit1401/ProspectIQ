@@ -20,8 +20,12 @@ class Settings(BaseSettings):
     OPENROUTER_API_KEY: str = ""
     GOOGLE_CLIENT_ID: str = ""
     GOOGLE_CLIENT_SECRET: str = ""
-    GOOGLE_REDIRECT_URI: str = "https://prospectiq-ijyz.onrender.com/auth/google/callback"
+    GOOGLE_REDIRECT_URI: str = "http://localhost:8000/auth/google/callback"
     FRONTEND_URL: str = "http://localhost:3000"
+    
+    APPCONNECTOR_API_KEY: str = ""
+    APPCONNECTOR_BASE_URL: str = "https://api.appconnector.pro"
+
 
     DATABASE_URL: str
 

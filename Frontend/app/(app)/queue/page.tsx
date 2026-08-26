@@ -6,6 +6,7 @@ import { OutreachReviewPanel } from "@/components/queue/outreach-review-panel";
 import { queueService } from "@/services/queue.service";
 import { ApiError } from "@/services/api-client";
 import { cn } from "@/lib/utils";
+import { fetchWithCache, getCached, setCached } from "@/lib/data-cache";
 import type { OutreachDraft } from "@/types";
 
 const STATUS_DOT: Record<OutreachDraft["status"], string> = {
@@ -13,23 +14,38 @@ const STATUS_DOT: Record<OutreachDraft["status"], string> = {
   approved: "bg-emerald-400",
   rejected: "bg-red-400",
   edited: "bg-white/40",
+  sent: "bg-emerald-400",
 };
 
+const QUEUE_CACHE_KEY = "queue:drafts";
+
 export default function QueuePage() {
-  const [drafts, setDrafts] = useState<OutreachDraft[]>([]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [drafts, setDrafts] = useState<OutreachDraft[]>(
+    () => getCached<OutreachDraft[]>(QUEUE_CACHE_KEY) ?? [],
+  );
+  const [selectedId, setSelectedId] = useState<string | null>(
+    () => getCached<OutreachDraft[]>(QUEUE_CACHE_KEY)?.[0]?.id ?? null,
+  );
+  const [loading, setLoading] = useState(
+    () => getCached<OutreachDraft[]>(QUEUE_CACHE_KEY) === undefined,
+  );
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
 
-    queueService
-      .list()
+    fetchWithCache(QUEUE_CACHE_KEY, () => queueService.list(), {
+      onRevalidate: (fresh) => {
+        if (!cancelled) {
+          setDrafts(fresh);
+          setSelectedId((current) => current ?? (fresh.length > 0 ? fresh[0].id : null));
+        }
+      },
+    })
       .then((data) => {
         if (cancelled) return;
         setDrafts(data);
-        if (data.length > 0) setSelectedId(data[0].id);
+        setSelectedId((current) => current ?? (data.length > 0 ? data[0].id : null));
       })
       .catch((err) => {
         if (!cancelled) {
@@ -49,14 +65,44 @@ export default function QueuePage() {
     };
   }, []);
 
+  // Keep the cache in sync with local mutations so navigating away and
+  // back shows the latest state instantly instead of a stale re-fetch.
+  function updateDrafts(updater: (prev: OutreachDraft[]) => OutreachDraft[]) {
+    setDrafts((prev) => {
+      const next = updater(prev);
+      setCached(QUEUE_CACHE_KEY, next);
+      return next;
+    });
+  }
+
   async function handleApprove(id: string) {
     const updated = await queueService.approve(id);
-    setDrafts((prev) => prev.map((d) => (d.id === id ? updated : d)));
+    updateDrafts((prev) => prev.map((d) => (d.id === id ? updated : d)));
   }
 
   async function handleReject(id: string) {
     const updated = await queueService.reject(id);
-    setDrafts((prev) => prev.map((d) => (d.id === id ? updated : d)));
+    updateDrafts((prev) => prev.map((d) => (d.id === id ? updated : d)));
+  }
+
+
+  async function handleDelete(id: string) {
+    await queueService.deleteDraft(id);
+    updateDrafts((prev) => prev.filter((d) => d.id !== id));
+    if (selectedId === id) setSelectedId(null);
+  }
+
+  async function handleSent(updated: OutreachDraft) {
+    if (!updated?.id) {
+      console.error("handleSent called with invalid draft:", updated);
+      return;
+    }
+    updateDrafts((prev) => prev.map((d) => (d.id === updated.id ? updated : d)));
+  }
+
+  async function handleFollowupCreated(followup: OutreachDraft) {
+    updateDrafts((prev) => [followup, ...prev]);
+    setSelectedId(followup.id);
   }
 
   const selectedIndex = drafts.findIndex((d) => d.id === selectedId);
@@ -126,14 +172,17 @@ export default function QueuePage() {
 
           {selectedDraft && (
             <OutreachReviewPanel
-              draft={selectedDraft}
-              index={selectedIndex}
-              total={drafts.length}
-              onPrev={goPrev}
-              onNext={goNext}
-              onApprove={handleApprove}
-              onReject={handleReject}
-            />
+            draft={selectedDraft}
+            index={selectedIndex}
+            total={drafts.length}
+            onPrev={goPrev}
+            onNext={goNext}
+            onApprove={handleApprove}
+            onReject={handleReject}
+            onDelete={handleDelete}
+            onSent={handleSent}
+            onFollowupCreated={handleFollowupCreated}
+          />
           )}
         </div>
       )}

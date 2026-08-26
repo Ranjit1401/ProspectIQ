@@ -188,13 +188,16 @@ export interface OutreachDraft {
   companyId: string;
   companyName: string;
   stakeholderName: string;
+  stakeholderEmail: string | null;
+  emailVerified: boolean;
+  emailMxDomain: string | null;
   channel: "email" | "linkedin" | "call-script";
   subject: string;
   body: string;
   confidence: number;
   reasoning: string;
   evidence: string[];
-  status: "pending" | "approved" | "rejected" | "edited";
+  status: "pending" | "approved" | "rejected" | "edited" | "sent";
   createdAt: string;
 }
 
