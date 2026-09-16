@@ -12,6 +12,7 @@ import {
   Settings,
   Sparkles,
   BookOpen,
+  Bot,
 } from "lucide-react";
 import {
   CommandDialog,
@@ -126,6 +127,10 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
           <CommandItem onSelect={() => go("/queue")}>
             <ListChecks className="h-4 w-4 text-white/40" />
             <span>Outreach Queue</span>
+          </CommandItem>
+          <CommandItem onSelect={() => go("/agent-room")}>
+            <Bot className="h-4 w-4 text-cyan-400" />
+            <span>Agent Discussion Room</span>
           </CommandItem>
           <CommandItem onSelect={() => go("/audit")}>
             <ScrollText className="h-4 w-4 text-white/40" />

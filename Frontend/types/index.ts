@@ -248,5 +248,6 @@ export type NavKey =
   | "graph"
   | "recommendations"
   | "queue"
+  | "agent-room"
   | "audit"
   | "profile";
