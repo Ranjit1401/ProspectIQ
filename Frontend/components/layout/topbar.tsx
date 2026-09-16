@@ -1,7 +1,8 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { Search, Bell, Menu } from "lucide-react";
+import { Search, Menu } from "lucide-react";
+import { NotificationPopover } from "@/components/layout/notification-popover";
 import { NAV_ITEMS } from "@/lib/constants";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useCurrentUser } from "@/components/auth/auth-guard";
@@ -54,10 +55,7 @@ export function Topbar({
             ⌘K
           </kbd>
         </button>
-        <button className="relative rounded-xl border border-white/8 bg-white/[0.02] p-2.5 text-white/50 hover:text-white/80 hover:border-white/15 transition-colors">
-          <Bell className="h-4 w-4" />
-          <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-white" />
-        </button>
+        <NotificationPopover />
         <Link
           href="/profile"
           className="lg:hidden rounded-full transition-opacity hover:opacity-80"

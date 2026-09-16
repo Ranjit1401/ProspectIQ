@@ -69,6 +69,40 @@ let state: WorkspaceState = {
 const threads = new Map<string, WorkspaceState>();
 let activeThreadKey: string = DEFAULT_THREAD_KEY;
 
+function saveThreadsToStorage() {
+  if (typeof window === "undefined") return;
+  try {
+    const data: Record<string, WorkspaceState> = {};
+    threads.forEach((val, key) => {
+      data[key] = {
+        messages: val.messages,
+        sending: false,
+        result: val.result,
+        activeCompanyId: val.activeCompanyId,
+      };
+    });
+    localStorage.setItem("prospectiq_chat_threads", JSON.stringify(data));
+  } catch {}
+}
+
+function loadThreadsFromStorage() {
+  if (typeof window === "undefined") return;
+  try {
+    const raw = localStorage.getItem("prospectiq_chat_threads");
+    if (raw) {
+      const parsed: Record<string, WorkspaceState> = JSON.parse(raw);
+      Object.entries(parsed).forEach(([key, val]) => {
+        threads.set(key, val);
+      });
+    }
+  } catch {}
+}
+
+// Initial load from storage on browser mount
+if (typeof window !== "undefined") {
+  loadThreadsFromStorage();
+}
+
 const listeners = new Set<() => void>();
 let abortController: AbortController | null = null;
 
@@ -80,6 +114,7 @@ function setState(patch: Partial<WorkspaceState> | ((prev: WorkspaceState) => Pa
   const next = typeof patch === "function" ? patch(state) : patch;
   state = { ...state, ...next };
   threads.set(activeThreadKey, state);
+  saveThreadsToStorage();
   emit();
 }
 
@@ -295,9 +330,34 @@ export async function sendWorkspaceMessage(
   const controller = new AbortController();
   abortController = controller;
 
+  // Build full context and history for follow-up chat questions
+  let promptWithHistory = text;
+  const currentMessages = state.messages.filter(
+    (m) => m.id !== userMessage.id && m.id !== assistantId && m.id !== "welcome"
+  );
+
+  if (currentMessages.length > 0 || state.result) {
+    const companyName =
+      state.result?.overall_assessment?.company ||
+      state.result?.knowledge?.company ||
+      "Target Account";
+
+    const historyStr = currentMessages
+      .slice(-6)
+      .map((m) => {
+        if (m.kind === "report" && m.report?.company) {
+          return `Assistant: [Analysis Report for ${m.report.company}] Recommendation: ${m.report.recommendation || ""}. Buying Stage: ${m.report.buyingStage || ""}. Risk Level: ${m.report.riskLevel || ""}.`;
+        }
+        return `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`;
+      })
+      .join("\n");
+
+    promptWithHistory = `[Active Company Context: ${companyName}]\n[Prior Conversation History]:\n${historyStr}\n\n[User Follow-Up Question]:\n${text}`;
+  }
+
   try {
     await workspaceService.streamSupervisor(
-      text,
+      promptWithHistory,
       (frame: StreamFrame) => {
         if (frame.type === "step") {
           upsertStep(frame.data);

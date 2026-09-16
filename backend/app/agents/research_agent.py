@@ -36,15 +36,16 @@ class ResearchAgent(BaseAgent):
             # Let the LLM summarize search results
             if tool == "search" and tool_result.get("success"):
             
-                prompt = f"""
-        User Question:
-        {task}
-        
-        Search Results:
-        {tool_result['results']}
-        
-        Write a clear answer using the search results.
-        """
+                prompt = f"""You are ProspectIQ's AI Sales Intelligence Assistant.
+
+Context & Question:
+{task}
+
+Search Results:
+{tool_result['results']}
+
+Write a clear, direct, and actionable answer using the context and search results.
+"""
         
                 llm_response = await self.llm.generate(prompt)
         
@@ -61,9 +62,15 @@ class ResearchAgent(BaseAgent):
                 "response": tool_result,
             }
 
-        # No tool was needed — answer directly instead of falling through
-        # and returning None (which previously crashed the Supervisor).
-        llm_response = await self.llm.generate(task)
+        # No tool was needed — answer directly using full context and history
+        prompt = f"""You are ProspectIQ's AI Sales Intelligence Assistant.
+
+Context & User Question:
+{task}
+
+Provide a direct, helpful, and highly accurate answer based on the conversation history and context above.
+"""
+        llm_response = await self.llm.generate(prompt)
 
         return {
             "agent": self.name,

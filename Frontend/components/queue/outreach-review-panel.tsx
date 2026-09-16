@@ -11,7 +11,10 @@ import {
   Mail,
   Linkedin,
   Phone,
+  Clock,
+  Sparkles,
 } from "lucide-react";
+import { calculateBestSendTime } from "@/lib/send-time-optimizer";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -312,6 +315,37 @@ export function OutreachReviewPanel({
                   />
                 </div>
               </div>
+            </Card>
+
+            <Card className="border border-white/10 bg-gradient-to-r from-cyan-950/20 via-black to-purple-950/20 p-4">
+              {(() => {
+                const bestTime = calculateBestSendTime(draft.stakeholderName, draft.companyName);
+                return (
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-start gap-3">
+                      <div className="mt-0.5 rounded-xl bg-cyan-500/10 p-2.5 text-cyan-400 border border-cyan-500/20">
+                        <Clock className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="text-xs font-semibold uppercase tracking-wider text-white">
+                            Optimal Send Window
+                          </h4>
+                          <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-400 border border-emerald-500/20">
+                            {bestTime.openRateBoost} Open Rate
+                          </span>
+                        </div>
+                        <p className="mt-0.5 text-sm font-medium text-cyan-300">
+                          {bestTime.recommendedTime}
+                        </p>
+                        <p className="mt-1 text-[11px] text-white/50 leading-relaxed">
+                          {bestTime.reasoning}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
             </Card>
 
             <Card>
