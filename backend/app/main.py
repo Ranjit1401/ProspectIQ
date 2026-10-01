@@ -51,12 +51,11 @@ origins = [
     "http://127.0.0.1:3000",
 
     # Vercel Frontend
-    "https://prospectiq-ivory.vercel.app",
+    "https://prospect-iq-drab.vercel.app/",
 
     # Preview deployments
-    "https://prospectiq-nbw4ntl6u-nikita-santosh-mishras-projects.vercel.app/",
-    "https://prospectiq-git-main-nikita-santosh-mishras-projects.vercel.app/",
-]
+    "https://prospect-4zw62ppxf-ranjit-bhardwaj-s-projects.vercel.app/",
+    ]
 
 app.add_middleware(
     CORSMiddleware,
