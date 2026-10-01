@@ -52,10 +52,8 @@ origins = [
 
     # Vercel Frontend
     "https://prospect-iq-drab.vercel.app",
-    "https://prospect-iq-drab.vercel.app/",
 
     # Preview deployments
-    "https://prospect-4zw62ppxf-ranjit-bhardwaj-s-projects.vercel.app/",
     "https://prospect-4zw62ppxf-ranjit-bhardwaj-s-projects.vercel.app",
 ]
 
