@@ -29,7 +29,9 @@ export function SignupForm() {
       } else {
         setError(
           "Could not reach the server. Is the backend running at " +
-            (import.meta.env.VITE_API_URL ?? "http://localhost:8000") +
+            (import.meta.env.NEXT_PUBLIC_API_URL ??
+              import.meta.env.VITE_API_URL ??
+              "http://localhost:8000") +
             "?",
         );
       }

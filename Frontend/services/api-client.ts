@@ -7,7 +7,18 @@
  * for live calls only requires editing the individual service file.
  */
 
-export const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
+// Resolution order:
+//   1. NEXT_PUBLIC_API_URL — set in Vercel/production deployment env.
+//   2. VITE_API_URL        — set in local .env for development.
+//   3. http://localhost:8000 — last-resort fallback.
+// Vite only injects VITE_-prefixed vars into import.meta.env, so a
+// NEXT_PUBLIC_* var would otherwise be invisible here. Reading it
+// explicitly lets the deployed frontend point at the real backend
+// while local dev keeps using VITE_API_URL.
+export const API_BASE_URL =
+  import.meta.env.NEXT_PUBLIC_API_URL ??
+  import.meta.env.VITE_API_URL ??
+  "http://localhost:8000";
 
 export class ApiError extends Error {
   status: number;

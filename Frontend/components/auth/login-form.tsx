@@ -43,13 +43,15 @@ export function LoginForm() {
             ? "Incorrect email or password."
             : err.message || "Login failed. Please try again.",
         );
-      } else {
-        setError(
-          "Could not reach the server. Is the backend running at " +
-            (import.meta.env.VITE_API_URL ?? "http://localhost:8000") +
-            "?",
-        );
-      }
+} else {
+          setError(
+            "Could not reach the server. Is the backend running at " +
+              (import.meta.env.NEXT_PUBLIC_API_URL ??
+                import.meta.env.VITE_API_URL ??
+                "http://localhost:8000") +
+              "?",
+          );
+        }
     } finally {
       setLoading(false);
     }
