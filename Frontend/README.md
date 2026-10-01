@@ -1,11 +1,11 @@
 # ProspectIQ — Frontend
 
-Production Next.js 15 (App Router) frontend for ProspectIQ, an explainable
+React 19 (Vite SPA + React Router v6) frontend for ProspectIQ, an explainable
 multi-agent account intelligence platform.
 
 ## Stack
 
-- Next.js 15 (App Router) + TypeScript
+- React 19 + Vite + React Router v6 + TypeScript
 - TailwindCSS + shadcn/ui-style component primitives (Radix under the hood)
 - Framer Motion for animation
 - React Flow for the Relationship Graph
@@ -20,13 +20,13 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:3000.
+Open http://localhost:5173.
 
 To build for production:
 
 ```bash
 npm run build
-npm run start
+npm run preview
 ```
 
 ## Connecting to the backend

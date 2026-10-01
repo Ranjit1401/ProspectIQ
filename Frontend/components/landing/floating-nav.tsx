@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -40,7 +40,7 @@ export function FloatingNav() {
             : "border-white/5 bg-white/[0.02] backdrop-blur-md",
         )}
       >
-        <Link href="/" className="flex items-center">
+        <Link to="/" className="flex items-center">
           <Logo height={22} priority />
         </Link>
 
@@ -57,12 +57,12 @@ export function FloatingNav() {
         </div>
 
         <div className="hidden md:flex items-center gap-2">
-          <Link href="/login">
+          <Link to="/login">
             <Button variant="ghost" size="sm">
               Sign in
             </Button>
           </Link>
-          <Link href="/login">
+          <Link to="/login">
             <Button size="sm">Request access</Button>
           </Link>
         </div>
@@ -93,12 +93,12 @@ export function FloatingNav() {
             </a>
           ))}
           <div className="mt-2 flex gap-2 px-1">
-            <Link href="/login" className="flex-1">
+            <Link to="/login" className="flex-1">
               <Button variant="outline" size="sm" className="w-full">
                 Sign in
               </Button>
             </Link>
-            <Link href="/login" className="flex-1">
+            <Link to="/login" className="flex-1">
               <Button size="sm" className="w-full">
                 Request access
               </Button>

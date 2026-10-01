@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowUpRight, Loader2, Trash2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -173,7 +173,7 @@ export function AccountsTable() {
                     </td>
                     <td className="px-5 py-3.5 text-right">
                       <Link
-                        href={`/accounts/${company.id}`}
+                        to={`/accounts/${company.id}`}
                         className="inline-flex items-center gap-1 text-xs text-white/35 opacity-0 transition-opacity group-hover:opacity-100 hover:text-white"
                       >
                         View report <ArrowUpRight className="h-3 w-3" />

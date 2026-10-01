@@ -1,4 +1,3 @@
-import Image from "next/image";
 import { cn } from "@/lib/utils";
 
 // Native asset dimensions — used to derive width from a given height so the
@@ -15,15 +14,14 @@ interface LogoProps {
 }
 
 
-export function Logo({ height = 32, className, priority }: LogoProps) {
+export function Logo({ height = 32, className }: LogoProps) {
   const width = Math.round(height * ASPECT_RATIO);
   return (
-    <Image
+    <img
       src="/logo/prospectiq-logo.png"
       alt="ProspectIQ"
       width={width}
       height={height}
-      priority={priority}
       className={cn("shrink-0 object-contain", className)}
       style={{ width, height }}
     />

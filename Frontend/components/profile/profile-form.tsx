@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useNavigate } from "react-router-dom";
 import {
   LogOut,
   User as UserIcon,
@@ -39,7 +39,7 @@ function initials(name: string) {
 }
 
 export function ProfileForm() {
-  const router = useRouter();
+  const navigate = useNavigate();
   const user = useCurrentUser();
 
   // Profile Form State
@@ -138,7 +138,7 @@ export function ProfileForm() {
 
   function handleLogout() {
     authService.logout();
-    router.push("/login");
+    navigate("/login");
   }
 
   return (

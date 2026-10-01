@@ -1,12 +1,9 @@
-"use client";
-
-import { usePathname } from "next/navigation";
+import { useLocation, Link } from "react-router-dom";
 import { Search, Menu } from "lucide-react";
 import { NotificationPopover } from "@/components/layout/notification-popover";
 import { NAV_ITEMS } from "@/lib/constants";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useCurrentUser } from "@/components/auth/auth-guard";
-import Link from "next/link";
 
 function initials(name: string) {
   return name
@@ -24,7 +21,7 @@ export function Topbar({
   onOpenPalette: () => void;
   onOpenMobileNav: () => void;
 }) {
-  const pathname = usePathname();
+  const { pathname } = useLocation();
   const current = NAV_ITEMS.find((item) => pathname?.startsWith(item.href));
   const user = useCurrentUser();
 
@@ -57,7 +54,7 @@ export function Topbar({
         </button>
         <NotificationPopover />
         <Link
-          href="/profile"
+          to="/profile"
           className="lg:hidden rounded-full transition-opacity hover:opacity-80"
         >
           <Avatar className="h-8 w-8">

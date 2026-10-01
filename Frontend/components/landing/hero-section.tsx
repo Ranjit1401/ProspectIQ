@@ -1,19 +1,21 @@
 "use client";
 
-import Link from "next/link";
+import { lazy, Suspense } from "react";
+import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowRight, ShieldCheck } from "lucide-react";
-import dynamic from "next/dynamic";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
-const Threads = dynamic(() => import("@/components/backgrounds/threads"), { ssr: false });
+const Threads = lazy(() => import("@/components/backgrounds/threads"));
 
 export function HeroSection() {
   return (
     <section className="relative flex min-h-[92vh] w-full items-center justify-center overflow-hidden">
       <div className="absolute inset-0">
-        <Threads color={[1, 1, 1]} amplitude={0.9} distance={0.25} enableMouseInteraction />
+        <Suspense fallback={null}>
+          <Threads color={[1, 1, 1]} amplitude={0.9} distance={0.25} enableMouseInteraction />
+        </Suspense>
       </div>
       <div className="absolute inset-0 bg-gradient-to-b from-[#090909]/10 via-[#090909]/40 to-[#090909]" />
 
@@ -57,7 +59,7 @@ export function HeroSection() {
           transition={{ duration: 0.7, delay: 0.3 }}
           className="mt-9 flex flex-col items-center gap-3 sm:flex-row"
         >
-          <Link href="/login">
+          <Link to="/login">
             <Button size="lg" className="group">
               Enter Workspace
               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />

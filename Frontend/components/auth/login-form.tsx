@@ -1,8 +1,6 @@
-"use client";
-
 import { useState, useRef, useEffect } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,7 +13,7 @@ import { GoogleLogin } from "@react-oauth/google";
 
 
 export function LoginForm() {
-  const router = useRouter();
+  const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(true);
@@ -37,7 +35,7 @@ export function LoginForm() {
     setError(null);
     try {
       await authService.login({ email, password });
-      router.push("/workspace");
+      navigate("/workspace");
     } catch (err) {
       if (err instanceof ApiError) {
         setError(
@@ -48,7 +46,7 @@ export function LoginForm() {
       } else {
         setError(
           "Could not reach the server. Is the backend running at " +
-            (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000") +
+            (import.meta.env.VITE_API_URL ?? "http://localhost:8000") +
             "?",
         );
       }
@@ -75,7 +73,7 @@ export function LoginForm() {
         <div className="flex items-center justify-between">
           <Label htmlFor="password">Password</Label>
           <Link
-            href="/forgot-password"
+            to="/forgot-password"
             className="text-[11px] text-white/40 hover:text-white/70 transition-colors"
           >
             Forgot password?
@@ -126,7 +124,7 @@ export function LoginForm() {
             try {
               await authService.googleLogin(credentialResponse.credential);
 
-              router.push("/workspace");
+              navigate("/workspace");
             } catch {
               setError("Google authentication failed.");
             }
@@ -146,7 +144,7 @@ export function LoginForm() {
       <p className="pt-2 text-center text-[11px] text-white/30">
         Don&apos;t have an account?{" "}
         <Link
-          href="/signup"
+          to="/signup"
           className="text-white/60 hover:text-white transition-colors"
         >
           Create one

@@ -1,7 +1,4 @@
-"use client";
-
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { Link, useLocation } from "react-router-dom";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X, Building2, Share2, ListChecks, ScrollText, Sparkles, Lightbulb, LayoutGrid, User } from "lucide-react";
 import { NAV_ITEMS } from "@/lib/constants";
@@ -30,7 +27,7 @@ interface MobileNavProps {
  * to reach Accounts/Graph/Queue/Audit on a phone at all.
  */
 export function MobileNav({ open, onOpenChange }: MobileNavProps) {
-  const pathname = usePathname();
+  const { pathname } = useLocation();
   const user = useCurrentUser();
 
   return (
@@ -63,7 +60,7 @@ export function MobileNav({ open, onOpenChange }: MobileNavProps) {
               return (
                 <Link
                   key={item.id}
-                  href={item.href}
+                  to={item.href}
                   onClick={() => onOpenChange(false)}
                   className={cn(
                     "flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm transition-colors",
@@ -81,7 +78,7 @@ export function MobileNav({ open, onOpenChange }: MobileNavProps) {
 
           <div className="border-t border-white/6 p-3">
             <Link
-              href="/profile"
+              to="/profile"
               onClick={() => onOpenChange(false)}
               className={cn(
                 "flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm transition-colors",

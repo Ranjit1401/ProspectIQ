@@ -1,13 +1,13 @@
 /**
  * Thin fetch wrapper around the ProspectIQ FastAPI backend.
  *
- * Set NEXT_PUBLIC_API_URL in .env.local once the backend is deployed
- * (e.g. NEXT_PUBLIC_API_URL=https://api.prospectiq.app). Every service
+ * Set VITE_API_URL in .env once the backend is deployed
+ * (e.g. VITE_API_URL=https://api.prospectiq.app). Every service
  * module in this folder calls through `apiFetch` so swapping mock data
  * for live calls only requires editing the individual service file.
  */
 
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+export const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 
 export class ApiError extends Error {
   status: number;

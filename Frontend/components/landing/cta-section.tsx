@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -22,7 +22,7 @@ export function CTASection() {
           you send anything.
         </p>
         <div className="mt-8 flex justify-center">
-          <Link href="/login">
+          <Link to="/login">
             <Button size="lg" className="group">
               Enter Workspace
               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
@@ -42,7 +42,7 @@ export function Footer() {
         <div className="flex items-center gap-5 text-xs text-white/35">
           <a href="#platform" className="hover:text-white/70 transition-colors">Platform</a>
           <a href="#comparison" className="hover:text-white/70 transition-colors">Why ProspectIQ</a>
-          <Link href="/login" className="hover:text-white/70 transition-colors">Sign in</Link>
+          <Link to="/login" className="hover:text-white/70 transition-colors">Sign in</Link>
         </div>
       </div>
     </footer>

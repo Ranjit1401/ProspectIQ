@@ -1,3 +1,4 @@
+# Round2-Decoders
 # ProspectIQ — AI Decision Intelligence Platform for Enterprise Sales
 
 ![ProspectIQ](image.png)
@@ -175,7 +176,7 @@ TAVILY_API_KEY=
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
 GOOGLE_REDIRECT_URI=http://localhost:8000/auth/google/callback
-FRONTEND_URL=http://localhost:3000
+FRONTEND_URL=http://localhost:5173
 ```
 
 See `app/core/config.py` for the full list of supported settings and their
@@ -189,7 +190,7 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:3000. Create `.env.local` with:
+Open http://localhost:5173. Create `.env` with:
 
 ```env
 NEXT_PUBLIC_API_URL=http://localhost:8000
@@ -223,8 +224,8 @@ service + Next.js app.
 
 ## Team
 
-Nikita Mishra · Ranjit Bhardwaj · Gaurav Chauhan
+Nikita Mishra · Ranjit Bhardwaj 
 
 ## License
 
-Developed for NexBuildOn Hack 2026. All rights reserved © 2026.
+Developed for Morrow 1.0 Hackthon. All rights reserved © 2026.

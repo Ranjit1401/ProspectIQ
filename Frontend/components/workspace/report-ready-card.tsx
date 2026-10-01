@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { FileCheck2, Eye, Sparkles, Network, Loader2, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,7 @@ interface ReportReadyCardProps {
 }
 
 export function ReportReadyCard({ report, onPreview }: ReportReadyCardProps) {
-  const router = useRouter();
+  const navigate = useNavigate();
   const [previewOpen, setPreviewOpen] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [generated, setGenerated] = useState<string | null>(null);
@@ -47,7 +47,7 @@ export function ReportReadyCard({ report, onPreview }: ReportReadyCardProps) {
 
   function handleViewGraph() {
     if (!report.companyId) return;
-    router.push(`/graph?company=${report.companyId}`);
+    navigate(`/graph?company=${report.companyId}`);
   }
 
   return (
@@ -144,7 +144,7 @@ export function ReportReadyCard({ report, onPreview }: ReportReadyCardProps) {
           Draft #{generated} is now pending in the{" "}
           <button
             type="button"
-            onClick={() => router.push("/queue")}
+            onClick={() => navigate("/queue")}
             className="text-emerald-400 underline underline-offset-2 hover:text-emerald-300"
           >
             Outreach Queue

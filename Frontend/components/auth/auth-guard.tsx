@@ -1,7 +1,5 @@
-"use client";
-
 import { createContext, useContext, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useNavigate } from "react-router-dom";
 import { authService, type CurrentUser } from "@/services/auth.service";
 import { getToken, clearToken } from "@/services/api-client";
 
@@ -17,7 +15,7 @@ export function useCurrentUser() {
 }
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
-  const router = useRouter();
+  const navigate = useNavigate();
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [checked, setChecked] = useState(false);
 
@@ -26,7 +24,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
 
     async function verify() {
       if (!getToken()) {
-        router.replace("/login");
+        navigate("/login", { replace: true });
         return;
       }
 
@@ -39,7 +37,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
       } catch {
         // Token missing/expired/invalid — clear it and send back to login.
         clearToken();
-        if (!cancelled) router.replace("/login");
+        if (!cancelled) navigate("/login", { replace: true });
       }
     }
 
@@ -47,7 +45,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [router]);
+  }, [navigate]);
 
   if (!checked) {
     return (

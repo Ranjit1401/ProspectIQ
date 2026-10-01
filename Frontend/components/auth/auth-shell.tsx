@@ -1,11 +1,9 @@
-"use client";
-
-import Link from "next/link";
-import dynamic from "next/dynamic";
+import { lazy, Suspense } from "react";
+import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Logo } from "@/components/common/logo";
 
-const Threads = dynamic(() => import("@/components/backgrounds/threads"), { ssr: false });
+const Threads = lazy(() => import("@/components/backgrounds/threads"));
 
 export function AuthShell({
   title,
@@ -19,7 +17,9 @@ export function AuthShell({
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#090909] px-4">
       <div className="absolute inset-0 opacity-70">
-        <Threads color={[1, 1, 1]} amplitude={0.5} distance={0.15} enableMouseInteraction={false} />
+        <Suspense fallback={null}>
+          <Threads color={[1, 1, 1]} amplitude={0.5} distance={0.15} enableMouseInteraction={false} />
+        </Suspense>
       </div>
       <div className="absolute inset-0 bg-gradient-to-b from-[#090909]/60 via-[#090909]/70 to-[#090909]" />
 
@@ -29,7 +29,7 @@ export function AuthShell({
         transition={{ duration: 0.5 }}
         className="relative z-10 w-full max-w-sm"
       >
-        <Link href="/" className="mb-8 flex items-center justify-center">
+        <Link to="/" className="mb-8 flex items-center justify-center">
           <Logo height={40} priority />
         </Link>
 

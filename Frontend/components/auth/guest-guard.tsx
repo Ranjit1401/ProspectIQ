@@ -1,7 +1,5 @@
-"use client";
-
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useNavigate } from "react-router-dom";
 import { authService } from "@/services/auth.service";
 import { getToken, clearToken } from "@/services/api-client";
 
@@ -12,7 +10,7 @@ import { getToken, clearToken } from "@/services/api-client";
  * token is stale/invalid, just render the form as normal.
  */
 export function GuestGuard({ children }: { children: React.ReactNode }) {
-  const router = useRouter();
+  const navigate = useNavigate();
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -28,7 +26,7 @@ export function GuestGuard({ children }: { children: React.ReactNode }) {
 
       try {
         await authService.me();
-        if (!cancelled) router.replace("/workspace");
+        if (!cancelled) navigate("/workspace", { replace: true });
       } catch {
         // Stale/invalid token — clear it and let the form show normally.
         clearToken();
@@ -40,7 +38,7 @@ export function GuestGuard({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [router]);
+  }, [navigate]);
 
   if (!ready) {
     return (

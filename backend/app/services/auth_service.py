@@ -59,6 +59,11 @@ class AuthService:
         if not user:
             raise ValueError("Invalid credentials")
 
+        if user.hashed_password == "google_auth_user":
+            raise ValueError(
+                "This account was registered using Google Sign-In. Please sign in with Google."
+            )
+
         if not verify_password(
             credentials.password,
             user.hashed_password,

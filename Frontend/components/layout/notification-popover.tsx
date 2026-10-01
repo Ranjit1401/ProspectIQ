@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { Bell, CheckCircle2, Clock, Mail, Sparkles, Check, Trash2 } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { Bell, CheckCircle2, Mail, Sparkles, Check } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,7 +25,7 @@ export interface NotificationItem {
 }
 
 export function NotificationPopover() {
-  const router = useRouter();
+  const navigate = useNavigate();
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [readIds, setReadIds] = useState<Set<string>>(new Set());
@@ -169,7 +168,7 @@ export function NotificationPopover() {
                   key={item.id}
                   onClick={() => {
                     markAsRead(item.id);
-                    router.push(item.href);
+                    navigate(item.href);
                   }}
                   className={`group relative flex items-start gap-3 p-3 rounded-xl cursor-pointer transition-all ${
                     isRead ? "opacity-60 hover:opacity-100 hover:bg-white/[0.03]" : "bg-white/[0.03] hover:bg-white/[0.06]"
@@ -222,7 +221,7 @@ export function NotificationPopover() {
 
         <div className="p-2 border-t border-white/8 bg-white/[0.01]">
           <Link
-            href="/queue"
+            to="/queue"
             className="block w-full text-center py-1.5 text-xs font-medium text-white/50 hover:text-cyan-400 transition-colors"
           >
             View Outreach Queue →

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams } from "react-router-dom";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -37,7 +37,11 @@ export default function ExecutiveReportPage() {
     let cancelled = false;
 
     setLoading(true);
-    setNotFoundMsg(null);
+    if (!id) {
+      setLoading(false);
+      setNotFoundMsg("Account ID not found");
+      return;
+    }
 
     Promise.all([
       workspaceService.getCompanyDashboard(id),

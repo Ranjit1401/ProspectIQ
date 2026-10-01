@@ -1,8 +1,5 @@
-"use client";
-
 import { useState } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { Link, useNavigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,7 +8,7 @@ import { authService } from "@/services/auth.service";
 import { ApiError } from "@/services/api-client";
 
 export function SignupForm() {
-  const router = useRouter();
+  const navigate = useNavigate();
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -25,14 +22,14 @@ export function SignupForm() {
     try {
       await authService.register({ username, email, password });
       await authService.login({ email, password });
-      router.push("/workspace");
+      navigate("/workspace");
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.message || "Signup failed. Please try again.");
       } else {
         setError(
           "Could not reach the server. Is the backend running at " +
-            (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000") +
+            (import.meta.env.VITE_API_URL ?? "http://localhost:8000") +
             "?",
         );
       }
@@ -89,7 +86,7 @@ export function SignupForm() {
 
       <p className="pt-2 text-center text-[11px] text-white/30">
         Already have an account?{" "}
-        <Link href="/login" className="text-white/60 hover:text-white transition-colors">
+        <Link to="/login" className="text-white/60 hover:text-white transition-colors">
           Sign in
         </Link>
       </p>

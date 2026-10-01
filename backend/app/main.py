@@ -45,15 +45,17 @@ app = FastAPI(
 # CORS Configuration
 # =========================
 origins = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
 
     # Vercel Frontend
-    "https://prospect-iq-oobr.vercel.app",
+    "https://prospectiq-ivory.vercel.app",
 
     # Preview deployments
-    "https://prospect-iq-oobr-69pb4yf10-ranjit-bhardwaj-s-projects.vercel.app/",
-    "https://prospect-iq-oobr-git-main-ranjit-bhardwaj-s-projects.vercel.app/",
+    "https://prospectiq-nbw4ntl6u-nikita-santosh-mishras-projects.vercel.app/",
+    "https://prospectiq-git-main-nikita-santosh-mishras-projects.vercel.app/",
 ]
 
 app.add_middleware(

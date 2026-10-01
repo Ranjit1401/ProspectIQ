@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useNavigate } from "react-router-dom";
 import {
   Building2,
   FileSearch,
@@ -33,7 +33,7 @@ interface CommandPaletteProps {
 }
 
 export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
-  const router = useRouter();
+  const navigate = useNavigate();
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -64,7 +64,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   }, [open]);
 
   const go = (href: string) => {
-    router.push(href);
+    navigate(href);
     onOpenChange(false);
   };
 

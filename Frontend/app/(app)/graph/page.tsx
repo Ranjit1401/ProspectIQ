@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { RelationshipGraph } from "@/components/graph/relationship-graph";
 import { accountsService } from "@/services/accounts.service";
@@ -33,8 +33,8 @@ export default function GraphPage() {
 }
 
 function GraphPageInner() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const companyId = searchParams.get("company");
 
   const [companies, setCompanies] = useState<Company[]>(
@@ -65,7 +65,7 @@ function GraphPageInner() {
         if (cancelled) return;
         setCompanies(data);
         if (!companyId && data.length > 0) {
-          router.replace(`/graph?company=${data[0].id}`);
+          navigate(`/graph?company=${data[0].id}`, { replace: true });
         }
       })
       .catch(() => {
@@ -145,7 +145,7 @@ function GraphPageInner() {
         {companies.length > 0 && (
           <select
             value={companyId ?? ""}
-            onChange={(e) => router.push(`/graph?company=${e.target.value}`)}
+            onChange={(e) => navigate(`/graph?company=${e.target.value}`)}
             className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs text-white/70 outline-none"
           >
             {companies.map((c) => (

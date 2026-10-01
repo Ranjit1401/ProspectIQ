@@ -1,7 +1,4 @@
-"use client";
-
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { Link, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   LayoutGrid,
@@ -31,7 +28,7 @@ const ICONS: Record<string, React.ElementType> = {
 };
 
 export function Sidebar({ onOpenPalette }: { onOpenPalette: () => void }) {
-  const pathname = usePathname();
+  const { pathname } = useLocation();
   const user = useCurrentUser();
 
   const displayName = user?.username || "Account";
@@ -55,7 +52,7 @@ export function Sidebar({ onOpenPalette }: { onOpenPalette: () => void }) {
           return (
             <Link
               key={item.id}
-              href={item.href}
+              to={item.href}
               className={cn(
                 "group relative flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-[14px] transition-colors",
                 isActive ? "text-white" : "text-white/45 hover:text-white/80 hover:bg-white/[0.03]",
@@ -91,7 +88,7 @@ export function Sidebar({ onOpenPalette }: { onOpenPalette: () => void }) {
 
       <div className="border-t border-white/6 p-3">
         <Link
-          href="/profile"
+          to="/profile"
           className={cn(
             "flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm transition-colors",
             pathname?.startsWith("/profile")

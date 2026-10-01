@@ -1,7 +1,5 @@
-"use client";
-
 import { useState } from "react";
-import Link from "next/link";
+import { Link } from "react-router-dom";
 import { CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,7 +23,7 @@ export function ForgotPasswordForm() {
           If an account exists for <span className="text-white/60">{email}</span>, a reset link is on
           its way.
         </p>
-        <Link href="/login" className="mt-2 text-xs text-white/50 hover:text-white transition-colors">
+        <Link to="/login" className="mt-2 text-xs text-white/50 hover:text-white transition-colors">
           Back to sign in
         </Link>
       </div>
@@ -49,7 +47,7 @@ export function ForgotPasswordForm() {
         Send reset link
       </Button>
       <p className="pt-2 text-center text-[11px] text-white/30">
-        <Link href="/login" className="text-white/60 hover:text-white transition-colors">
+        <Link to="/login" className="text-white/60 hover:text-white transition-colors">
           Back to sign in
         </Link>
       </p>
