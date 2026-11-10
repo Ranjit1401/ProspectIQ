@@ -1,4 +1,3 @@
-# Round2-Decoders
 # ProspectIQ — AI Decision Intelligence Platform for Enterprise Sales
 
 ![ProspectIQ](image.png)
