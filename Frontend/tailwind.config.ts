@@ -93,6 +93,10 @@ const config: Config = {
           "0%, 100%": { opacity: "1" },
           "50%": { opacity: "0.5" },
         },
+        "glow-pulse": {
+          "0%, 100%": { opacity: "0.85", filter: "brightness(1)" },
+          "50%": { opacity: "1", filter: "brightness(1.25)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -100,10 +104,15 @@ const config: Config = {
         shimmer: "shimmer 2.5s linear infinite",
         "fade-up": "fade-up 0.5s ease-out",
         "pulse-soft": "pulse-soft 2.4s ease-in-out infinite",
+        "glow-pulse": "glow-pulse 3s ease-in-out infinite",
       },
       boxShadow: {
         premium: "0 1px 0 0 rgba(255,255,255,0.04) inset, 0 20px 60px -20px rgba(0,0,0,0.6)",
         glow: "0 0 40px -10px rgba(255,255,255,0.15)",
+        "glow-cyan": "0 0 30px -5px rgba(6, 182, 212, 0.25)",
+        "glow-emerald": "0 0 30px -5px rgba(16, 185, 129, 0.25)",
+        "glow-amber": "0 0 30px -5px rgba(245, 158, 11, 0.25)",
+        "card-hover": "0 1px 0 0 rgba(255,255,255,0.08) inset, 0 24px 60px -15px rgba(0,0,0,0.75)",
       },
     },
   },

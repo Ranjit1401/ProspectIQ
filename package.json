@@ -1,4 +1,19 @@
 {
+  "name": "prospectiq-rocketai",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ProspectIQ — AI Decision Intelligence Platform for Enterprise Sales",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "dev:frontend": "npm --prefix Frontend run dev",
+    "build:frontend": "npm --prefix Frontend run build",
+    "preview:frontend": "npm --prefix Frontend run preview",
+    "lint:frontend": "npm --prefix Frontend run lint",
+    "dev:backend": "python -m uvicorn app.main:app --app-dir backend --reload",
+    "test:backend": "python -m unittest discover -s backend/tests -v"
+  },
   "dependencies": {
     "@react-oauth/google": "^0.13.5"
   }

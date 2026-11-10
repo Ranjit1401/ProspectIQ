@@ -1,5 +1,7 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.api.health import router as health_router
 from app.core.config import settings
@@ -38,8 +40,29 @@ from app.api.enrichment import router as enrichment_router
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
-    description="ProspectIQ",
+    description="ProspectIQ — Enterprise Sales Intelligence Platform",
 )
+
+
+# =========================
+# Security Headers Middleware
+# =========================
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        # Defense-in-depth HTTP security headers
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+        if not settings.DEBUG:
+            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        return response
+
+
+app.add_middleware(SecurityHeadersMiddleware)
+
 
 # =========================
 # CORS Configuration
@@ -58,13 +81,39 @@ origins = [
     "https://prospect-4zw62ppxf-ranjit-bhardwaj-s-projects.vercel.app",
 ]
 
+# Add dynamically configured origins from environment if present
+if settings.CORS_ORIGINS:
+    extra_origins = [o.strip() for o in settings.CORS_ORIGINS.split(",") if o.strip()]
+    for origin in extra_origins:
+        if origin not in origins:
+            origins.append(origin)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
+
+
+# =========================
+# Global Safe Exception Handler
+# =========================
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Unhandled error processing {request.method} {request.url.path}: {exc}", exc_info=True)
+    # Never leak raw stack traces or database connection errors to clients in production
+    if settings.DEBUG:
+        return JSONResponse(
+            status_code=500,
+            content={"detail": f"Internal server error: {str(exc)}"},
+        )
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "An unexpected server error occurred. Please try again later."},
+    )
 
 # =========================
 # Routers

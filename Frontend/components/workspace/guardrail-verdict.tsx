@@ -36,7 +36,7 @@ export function GuardrailVerdict({
     return (
       <div
         className={cn(
-          "rounded-2xl border-2 border-red-500/40 bg-red-500/[0.07] p-4",
+          "rounded-2xl border-2 border-red-500/40 bg-red-500/[0.07] backdrop-blur-md p-4 shadow-[0_0_25px_-6px_rgba(239,68,68,0.25)] transition-all",
           compact ? "space-y-2.5" : "space-y-3",
         )}
       >
@@ -100,7 +100,7 @@ export function GuardrailVerdict({
   return (
     <div
       className={cn(
-        "rounded-2xl border border-emerald-500/25 bg-emerald-500/[0.05] p-4",
+        "rounded-2xl border border-emerald-500/25 bg-emerald-500/[0.05] backdrop-blur-md p-4 shadow-glow-emerald transition-all",
         compact ? "space-y-2" : "space-y-2.5",
       )}
     >

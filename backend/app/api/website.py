@@ -1,7 +1,6 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, HttpUrl
 
-from fastapi import APIRouter, Depends
-
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user
@@ -18,12 +17,10 @@ router = APIRouter(
 )
 
 assistant = AssistantService()
-
 website = WebsiteService()
 
 
 class WebsiteRequest(BaseModel):
-
     url: str
 
 
@@ -33,10 +30,18 @@ async def analyze_website(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-
-    text = website.process(
-        request.url,
-    )
+    try:
+        text = website.process(request.url)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Unable to process website URL: {str(e)}",
+        )
 
     return await assistant.analyze(
         text=text,

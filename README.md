@@ -1,6 +1,6 @@
 # ProspectIQ — AI Decision Intelligence Platform for Enterprise Sales
 
-![ProspectIQ](image.png)
+![ProspectIQ](Frontend/public/image.png)
 ---
 
 ## The problem
@@ -87,9 +87,20 @@ Each agent is a focused class that makes its own LLM call, parses a structured J
 - Gmail integration for sending approved drafts
 
 **Frontend**
-- Next.js 15 (App Router) and TypeScript
-- Tailwind CSS and Radix-based UI primitives (shadcn/ui style)
+- React 19, Vite, React Router v6, and TypeScript
+- Tailwind CSS with custom glassmorphic & glow design tokens, plus Radix-based UI primitives (shadcn/ui style)
 - Framer Motion, React Flow (Relationship Graph), Recharts (Accounts dashboards), cmdk (command palette)
+
+---
+
+## Security & Hardening
+
+ProspectIQ implements defense-in-depth protections across the API and data ingestion layers:
+
+- **SSRF Prevention (`WebsiteScraper`)**: Blocks private RFC-1918 networks, loopback (`127.0.0.1`, `::1`), link-local / cloud metadata endpoints (`169.254.169.254`), enforces `http`/`https` schemes, validates redirect targets, and caps download size (`2 MB`).
+- **Upload & Path Traversal Protection (`DocumentService`)**: Sanitizes filenames using randomized UUID storage paths, validates file extensions (`.pdf`, `.docx`, `.txt`, `.csv`), enforces a `15 MB` upload limit, and ensures isolated temp directory cleanup.
+- **OAuth & Auth Hardening**: Validates Google ID token `audience` (`GOOGLE_CLIENT_ID`) and `email_verified` claims, enforces active account verification (`is_active`) on login and token dependencies, and enforces strict Pydantic password/username validation.
+- **HTTP Security Headers Middleware**: Automatically injects `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `X-XSS-Protection`, `Referrer-Policy`, `Permissions-Policy`, and `Strict-Transport-Security` (in non-debug deployments), along with safe exception handling and dynamic CORS configuration (`CORS_ORIGINS`).
 
 ---
 
@@ -157,14 +168,25 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:5173. Create `.env` with:
+Create `Frontend/.env` with:
 
 ```
-NEXT_PUBLIC_API_URL=http://localhost:8000
-NEXT_PUBLIC_GOOGLE_CLIENT_ID=
+VITE_API_URL=http://localhost:8000
+VITE_GOOGLE_CLIENT_ID=
 ```
 
-Open http://localhost:3000.
+Open http://localhost:5173.
+
+### Root Convenience Scripts
+
+From the repository root:
+
+```bash
+npm run dev:frontend     # Start Vite development server on port 5173
+npm run build:frontend   # Run TypeScript check and production Vite build
+npm run dev:backend      # Start FastAPI backend on port 8000 with hot reload
+npm run test:backend     # Run backend security unit test suite
+```
 
 ---
 
@@ -183,7 +205,7 @@ Open http://localhost:3000.
 - Outreach sends through Gmail only. LinkedIn and call-script drafts are generated but not sent.
 - `accounts.service.ts` contains a demo-only fallback that shows sample data when the backend is unreachable.
 - Meeting scheduling exists in the frontend but its backend endpoints are not finished.
-- No automated tests yet, and the Guardrail agent has not been formally benchmarked.
+- Security unit tests exist (`backend/tests/test_security.py`), though full end-to-end integration tests and Guardrail agent formal benchmarking are still pending.
 
 **Roadmap (not built)**
 - CRM integrations (HubSpot first)

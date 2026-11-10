@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user
@@ -103,9 +103,10 @@ async def get_analysis(
     )
 
     if analysis is None:
-        return {
-            "error": "Analysis not found"
-        }
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Analysis not found",
+        )
 
     knowledge = (
         db.query(KnowledgeSource)
@@ -155,9 +156,10 @@ async def delete_analysis(
     )
 
     if analysis is None:
-        return {
-            "error": "Analysis not found"
-        }
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Analysis not found",
+        )
 
     db.delete(analysis)
     db.commit()

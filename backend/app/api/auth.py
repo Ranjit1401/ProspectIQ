@@ -4,7 +4,9 @@ import hmac
 import secrets
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from urllib.parse import quote_plus
+
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
 from google.auth.transport import requests
 from google.oauth2 import id_token
@@ -553,11 +555,11 @@ def google_callback(
         )
 
     except HTTPException as e:
-
+        safe_detail = quote_plus(str(e.detail))
         return RedirectResponse(
             url=(
                 f"{settings.FRONTEND_URL}/queue"
-                f"?gmail_error={e.detail}"
+                f"?gmail_error={safe_detail}"
             )
         )
 
@@ -675,8 +677,13 @@ def google_auth(
     /google-auth is for ProspectIQ login while
     /google/connect is for connecting Gmail.
     """
-
-    return service.google_login(
-        db,
-        user,
-    )
+    try:
+        return service.google_login(
+            db,
+            user,
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=str(e),
+        )

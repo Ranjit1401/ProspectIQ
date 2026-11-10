@@ -1,8 +1,10 @@
+import secrets
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.auth.jwt import create_access_token
 from app.auth.password import hash_password, verify_password
+from app.core.config import settings
 from app.models.user import User
 from app.schemas.user import UserCreate, UserLogin
 from google.oauth2 import id_token
@@ -70,6 +72,9 @@ class AuthService:
         ):
             raise ValueError("Invalid credentials")
 
+        if not user.is_active:
+            raise ValueError("Account has been deactivated. Please contact support.")
+
         token = create_access_token(
             {
                 "sub": user.email,
@@ -87,13 +92,24 @@ class AuthService:
         db: Session,
         credentials: GoogleLogin,
     ):
+        try:
+            req = requests.Request()
+            audience = settings.GOOGLE_CLIENT_ID if settings.GOOGLE_CLIENT_ID else None
+            idinfo = id_token.verify_oauth2_token(
+                credentials.token,
+                req,
+                audience=audience,
+            )
+        except Exception as e:
+            raise ValueError(f"Google authentication failed: {str(e)}")
 
-        idinfo = id_token.verify_oauth2_token(
-            credentials.token,
-            requests.Request(),
-        )
+        email = idinfo.get("email")
+        if not email:
+            raise ValueError("Google token did not contain an email address")
 
-        email = idinfo["email"]
+        email_verified = idinfo.get("email_verified", False)
+        if not email_verified:
+            raise ValueError("Google account email is not verified")
 
         name = idinfo.get(
             "name",
@@ -103,18 +119,30 @@ class AuthService:
         user = db.query(User).filter(User.email == email).first()
 
         if not user:
+            # Prevent username collisions with existing users
+            chosen_username = name
+            existing_with_username = db.query(User).filter(User.username == chosen_username).first()
+            if existing_with_username:
+                chosen_username = f"{name}_{secrets.token_hex(3)}"
 
             user = User(
-                username=name,
+                username=chosen_username,
                 email=email,
                 hashed_password="google_auth_user",
             )
 
             db.add(user)
+            try:
+                db.commit()
+                db.refresh(user)
+            except IntegrityError:
+                db.rollback()
+                user = db.query(User).filter(User.email == email).first()
+                if not user:
+                    raise ValueError("Failed to create Google user account")
 
-            db.commit()
-
-            db.refresh(user)
+        if not user.is_active:
+            raise ValueError("User account is inactive")
 
         token = create_access_token(
             {

@@ -1,12 +1,46 @@
+# Python
 venv/
+.venv/
 __pycache__/
-.env
-*.pyc
-.vscode/
-.idea/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Node / Frontend
 node_modules/
 dist/
+build/
+.next/
+.out/
+.turbo/
 .tsbuildinfo
-.vercel
-.env*
+.vercel/
+npm-debug.log*
+
+# Secrets & Environment
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.cert
+*.pfx
+secrets/
+
+# Databases & Local Storage
+*.sqlite3
+*.db
+uploads/
+tmp/
+temp/
+
+# IDEs & OS
+.vscode/
+.idea/
 .kilo/
+.DS_Store
+Thumbs.db
