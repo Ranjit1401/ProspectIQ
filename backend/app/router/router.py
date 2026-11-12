@@ -1,3 +1,4 @@
+import re
 from app.core.context import context
 
 
@@ -6,41 +7,74 @@ class Router:
     Routes a task to the correct agent.
     """
 
-    # Short factual/general questions go to the research agent
-    # (calculator / web search / weather tools). Everything else is
-    # assumed to be prospect research - a company brief, notes, or
-    # website summary - and goes to the sales-analysis pipeline, since
-    # that's the primary purpose of this app.
-    RESEARCH_SIGNALS = [
-        "what is",
-        "who is",
-        "why",
-        "how does",
-        "how do",
-        "explain",
+    RESEARCH_SIGNALS = (
+        "what ",
+        "what's ",
+        "who ",
+        "who's ",
+        "why ",
+        "when ",
+        "where ",
+        "which ",
+        "how ",
+        "can you ",
+        "could you ",
+        "would you ",
+        "tell me ",
+        "explain ",
+        "summarize ",
+        "suggest ",
+        "give me ",
+        "write ",
+        "draft ",
+        "best time",
         "calculate",
         "weather",
         "forecast",
         "latest news",
-    ]
+        "compare ",
+    )
+
+    ANALYSIS_MARKERS = (
+        "company:",
+        "discovery notes:",
+        "industry:",
+        "analyze this company",
+        "analyze company",
+        "prepare an executive brief",
+        "sales intelligence pipeline",
+    )
+
+    @classmethod
+    def _extract_latest_user_prompt(cls, task: str) -> str:
+        """
+        The frontend prepends conversation history using
+        `[User Follow-Up Question]:\\n...`. Extract the actual question so
+        prior context doesn't make a 9-word question look like an 80-word brief.
+        """
+        marker = "[User Follow-Up Question]:"
+        if marker in task:
+            return task.split(marker, 1)[1].strip()
+        return task.strip()
 
     async def route(self, task: str):
         """
-        Decide which agent should execute the task.
-
-        This is a heuristic placeholder — swap it for an LLM-based
-        classifier later without changing the Supervisor or agents.
+        Decide whether a prompt is a conversational/research question
+        (`research` agent) or a full prospect brief (`sales_analysis` pipeline).
         """
+        latest_prompt = self._extract_latest_user_prompt(task)
+        normalized = re.sub(r"\s+", " ", latest_prompt.lower()).strip()
 
-        normalized = task.lower().strip()
+        # Explicit company brief / pipeline prompts always go to sales_analysis
+        if any(marker in normalized for marker in self.ANALYSIS_MARKERS):
+            return context.agent_registry.get("sales_analysis")
 
         looks_like_question = normalized.endswith("?") or any(
             normalized.startswith(signal) for signal in self.RESEARCH_SIGNALS
         )
+        word_count = len(normalized.split())
 
-        is_short = len(normalized.split()) <= 12
-
-        if looks_like_question and is_short:
+        if looks_like_question and word_count <= 40:
             return context.agent_registry.get("research")
 
         return context.agent_registry.get("sales_analysis")

@@ -28,6 +28,7 @@ class ResearchAgentV2(BaseAgent):
         **kwargs,
     ):
         emit = kwargs.get("emit")
+        mode = kwargs.get("mode", "chat")
 
         # -----------------------------
         # Build research plan
@@ -46,10 +47,26 @@ class ResearchAgentV2(BaseAgent):
             await emit_step(
                 emit,
                 id="research_plan",
-                label="No external lookup needed — using the task text directly.",
+                label="No external lookup needed — answering directly.",
                 status="done",
                 agent="ResearchAgentV2",
             )
+            if mode == "chat":
+                chat_prompt = f"""You are ProspectIQ's AI Sales Intelligence Assistant.
+
+Context & User Question:
+{task}
+
+Provide a clear, direct, and actionable answer using any conversation context above. Do not fabricate company facts."""
+                chat_resp = await self.llm.generate(chat_prompt)
+                answer_text = chat_resp.content if hasattr(chat_resp, "content") else str(chat_resp)
+                return {
+                    "agent": self.name,
+                    "tool_used": None,
+                    "response": {"content": answer_text},
+                    "evidence": answer_text,
+                    "sources": [],
+                }
             return {
                 "agent": self.name,
                 "tool_used": None,
@@ -201,9 +218,28 @@ Content:{article.get("content", "")}
 """
 
             # -----------------------------------
-            # Step 5: LLM Call for Evidence Synthesis
+            # Step 5: LLM Call for Evidence Synthesis or Chat Answer
             # -----------------------------------
-            prompt = f"""
+            if mode == "chat":
+                source_links = "\n".join(
+                    f"- {s.get('title', 'Source')}: {s.get('url', '')}"
+                    for s in top_sources
+                    if s.get("url")
+                )
+                prompt = f"""You are ProspectIQ's AI Sales Intelligence Assistant.
+
+Context & Question:
+{task}
+
+Collected Web & News Information:
+{search_text}
+
+Sources:
+{source_links or "None"}
+
+Write a clear, direct, and accurate answer to the user's question based on the context and sources above. Include relevant source links when citing external facts."""
+            else:
+                prompt = f"""
 User Request: {task}
 
 Collected Information:
@@ -219,6 +255,7 @@ Industry
 Products
 CEO
 Decision Makers
+Emails / Contact Info
 AI
 Recent News
 Hiring
@@ -229,18 +266,18 @@ Business Goals
             await emit_step(
                 emit,
                 id="research_synthesis",
-                label="Synthesizing everything into a single evidence brief...",
+                label="Preparing your answer..." if mode == "chat" else "Synthesizing everything into a single evidence brief...",
                 status="active",
                 agent="ResearchAgentV2",
             )
 
             response = await self.llm.generate(prompt)
-            evidence = response.content
+            evidence = response.content if hasattr(response, "content") else str(response)
 
             await emit_step(
                 emit,
                 id="research_synthesis",
-                label="Evidence brief ready.",
+                label="Answer ready." if mode == "chat" else "Evidence brief ready.",
                 status="done",
                 agent="ResearchAgentV2",
             )
@@ -260,6 +297,7 @@ Business Goals
                 "website": website,
                 "news": news,
                 "evidence": evidence,
+                "response": {"content": evidence} if mode == "chat" else None,
             }
 
         # -----------------------------------

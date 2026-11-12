@@ -30,6 +30,8 @@ class OpenRouterProvider(BaseLLMProvider):
 
         payload = {
             "model": self.model,
+            "temperature": 0.0,
+            "seed": 42,
             "messages": [
                 {
                     "role": "user",

@@ -337,6 +337,12 @@ async def workspace(
             }
         )
 
+    # Return most recently analyzed accounts first
+    response.sort(
+        key=lambda item: item["last_analysis"].timestamp() if item["last_analysis"] else 0.0,
+        reverse=True,
+    )
+
     return response
 @router.get("/stats")
 async def workspace_stats(

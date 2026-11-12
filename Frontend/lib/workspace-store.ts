@@ -336,6 +336,28 @@ function applyFinalResult(response: SupervisorResponse, assistantId: string) {
   }
 }
 
+/** Aborts any in-flight supervisor SSE stream and resets the composer state. */
+export function stopWorkspaceStream() {
+  if (abortController) {
+    abortController.abort();
+    abortController = null;
+  }
+  setState((prev) => ({
+    sending: false,
+    messages: prev.messages.map((m) =>
+      m.role === "assistant" && (m.kind === "loading" || m.kind === "stream")
+        ? {
+            ...m,
+            kind: "text",
+            content: "Generation stopped.",
+            steps: undefined,
+            chips: undefined,
+          }
+        : m,
+    ),
+  }));
+}
+
 export async function sendWorkspaceMessage(
   text: string,
   meta: { mode: WorkspaceMode; attachments: ComposerAttachment[] },
@@ -427,6 +449,10 @@ export async function sendWorkspaceMessage(
       controller.signal,
     );
   } catch (err) {
+    if (err instanceof DOMException && err.name === "AbortError") {
+      return;
+    }
+
     const message =
       err instanceof ApiError
         ? `The pipeline returned an error: ${err.message}`

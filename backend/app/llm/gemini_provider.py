@@ -31,6 +31,7 @@ class GeminiProvider(BaseLLMProvider):
         response = self.client.models.generate_content(
             model=self.model,
             contents=prompt,
+            config={"temperature": 0.0},
         )
 
         text = response.text if response.text else ""

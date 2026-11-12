@@ -15,10 +15,11 @@ import { cn } from "@/lib/utils";
 interface ChatPanelProps {
   messages: ChatMessage[];
   onSend: (text: string, meta: { mode: WorkspaceMode; attachments: ComposerAttachment[] }) => void | Promise<void>;
+  onStop?: () => void;
   sending?: boolean;
 }
 
-export function ChatPanel({ messages, onSend, sending }: ChatPanelProps) {
+export function ChatPanel({ messages, onSend, onStop, sending }: ChatPanelProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -91,7 +92,7 @@ export function ChatPanel({ messages, onSend, sending }: ChatPanelProps) {
       </ScrollArea>
 
       <div className="shrink-0">
-        <PromptComposer onSend={onSend} sending={sending} />
+        <PromptComposer onSend={onSend} onStop={onStop} sending={sending} />
       </div>
     </div>
   );

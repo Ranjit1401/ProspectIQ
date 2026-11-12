@@ -31,7 +31,8 @@ class GroqProvider(BaseLLMProvider):
                     "content": prompt,
                 }
             ],
-            temperature=0.7,
+            temperature=0.0,
+            seed=42,
         )
 
         latency = time.perf_counter() - start

@@ -7,6 +7,7 @@ import {
   ChevronDown,
   Mic,
   ArrowUp,
+  Square,
   FileText,
   Table,
   Globe,
@@ -76,10 +77,11 @@ const ADD_ITEMS: { kind: AttachmentKind; label: string; icon: React.ReactNode; g
 
 interface PromptComposerProps {
   onSend: (text: string, meta: { mode: WorkspaceMode; attachments: ComposerAttachment[] }) => void;
+  onStop?: () => void;
   sending?: boolean;
 }
 
-export function PromptComposer({ onSend, sending }: PromptComposerProps) {
+export function PromptComposer({ onSend, onStop, sending }: PromptComposerProps) {
   const [prompt, setPrompt] = useState("");
   const [mode, setMode] = useState<WorkspaceMode>("Deep Research");
   const [attachments, setAttachments] = useState<ComposerAttachment[]>([]);
@@ -308,20 +310,32 @@ export function PromptComposer({ onSend, sending }: PromptComposerProps) {
             >
               <Mic className="h-4 w-4" />
             </button>
-            <button
-              type="button"
-              onClick={handleSend}
-              disabled={!prompt.trim() || sending}
-              className={cn(
-                "flex h-9 w-9 items-center justify-center rounded-full transition-all",
-                prompt.trim() && !sending
-                  ? "btn-metallic"
-                  : "cursor-not-allowed bg-white/[0.05] text-white/25",
-              )}
-              aria-label="Send message"
-            >
-              <ArrowUp className="h-4 w-4" />
-            </button>
+            {sending ? (
+              <button
+                type="button"
+                onClick={onStop}
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-red-500/40 bg-red-500/15 text-red-300 transition-all hover:bg-red-500/25 hover:border-red-500/60 active:scale-95"
+                aria-label="Stop generating"
+                title="Stop generating"
+              >
+                <Square className="h-3.5 w-3.5 fill-current" />
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleSend}
+                disabled={!prompt.trim()}
+                className={cn(
+                  "flex h-9 w-9 items-center justify-center rounded-full transition-all",
+                  prompt.trim()
+                    ? "btn-metallic"
+                    : "cursor-not-allowed bg-white/[0.05] text-white/25",
+                )}
+                aria-label="Send message"
+              >
+                <ArrowUp className="h-4 w-4" />
+              </button>
+            )}
           </div>
         </div>
       </div>

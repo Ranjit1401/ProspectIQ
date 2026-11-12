@@ -58,17 +58,25 @@ class AssistantService:
         if not research_agent or research_agent.__class__.__name__ == "SalesAnalysisAgent":
             raise ValueError("Registry Error: 'research' agent returned an invalid or cyclic instance.")
 
+        raw_user_text = text
+
         # Future-proof method call passing user and DB session context
         research = await research_agent.run(
             task=text,
             current_user=current_user,
             db=db,
             emit=emit,
+            mode="evidence",
         )
 
-        # Send research evidence into downstream knowledge pipeline
+        # Combine research evidence with original user notes so explicit emails,
+        # contacts, and pain points in the prompt are never lost.
         if research and isinstance(research, dict) and research.get("evidence"):
-            text = research["evidence"]
+            evidence_text = str(research["evidence"])
+            if evidence_text.strip() != raw_user_text.strip():
+                text = f"{evidence_text}\n\nUser Provided Notes:\n{raw_user_text}"
+            else:
+                text = evidence_text
 
         await emit_step(
             emit,

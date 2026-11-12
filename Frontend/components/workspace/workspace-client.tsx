@@ -9,6 +9,7 @@ import {
   selectCompanySession,
   sendWorkspaceMessage,
   startNewChat,
+  stopWorkspaceStream,
   subscribeWorkspace,
 } from "@/lib/workspace-store";
 
@@ -40,7 +41,7 @@ export function WorkspaceClient() {
       </div>
 
       <div className="min-h-0">
-        <ChatPanel messages={messages} onSend={sendWorkspaceMessage} sending={sending} />
+        <ChatPanel messages={messages} onSend={sendWorkspaceMessage} onStop={stopWorkspaceStream} sending={sending} />
       </div>
 
       <div className="hidden min-h-0 overflow-y-auto pr-1 lg:block">

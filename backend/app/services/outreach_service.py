@@ -141,55 +141,64 @@ class OutreachService:
         draft: OutreachDraft,
     ) -> None:
         """
-        Best-effort: try to find + verify the stakeholder's email right
-        when the draft is created, so it's already sitting in the DB by
-        the time the person opens the queue. Never blocks or fails draft
-        creation — any error here is logged and swallowed.
+        Best-effort: extract or discover the stakeholder/firm email right
+        when the draft is created, checking user-supplied knowledge first,
+        then AppConnector (if configured), then official site /contact
+        pages and web search. Never blocks or fails draft creation.
         """
-        if not draft.stakeholder_name or draft.stakeholder_name == "Unknown contact":
-            return
-
         company = (
             db.query(Company)
             .filter(Company.id == draft.company_id)
             .first()
         )
-
-        if not company or not company.website:
+        if not company:
             return
 
         try:
-            # Local import to avoid a hard circular dependency between
-            # services; enrichment_service has no dependency back on this
-            # module, so this is just keeping the import surface small.
-            from app.api.enrichment import _extract_domain
-            from app.services.enrichment_service import (
-                EnrichmentService,
-                EnrichmentAPIError,
+            import json
+            from app.models.knowledge_source import KnowledgeSource
+            from app.utils.email_discovery import discover_company_email
+
+            knowledge_text = ""
+            sources = []
+            analysis = (
+                db.query(AnalysisResult)
+                .filter(AnalysisResult.id == draft.analysis_id)
+                .first()
+            )
+            if analysis and analysis.knowledge_id:
+                ks = (
+                    db.query(KnowledgeSource)
+                    .filter(KnowledgeSource.id == analysis.knowledge_id)
+                    .first()
+                )
+                if ks:
+                    knowledge_dict = (ks.processed_data or {}).get("knowledge", {}) if isinstance(ks.processed_data, dict) else {}
+                    sources = knowledge_dict.get("sources") or []
+                    knowledge_text = f"{ks.raw_content or ''}\n{json.dumps(ks.processed_data or {})}"
+                    if not company.website and knowledge_dict.get("website"):
+                        company.website = knowledge_dict.get("website")
+
+            email, domain, is_verified = discover_company_email(
+                company_name=company.name or "",
+                website=company.website,
+                stakeholder_name=draft.stakeholder_name or "",
+                knowledge_text=knowledge_text,
+                sources=sources,
             )
 
-            name_parts = draft.stakeholder_name.strip().split(" ", 1)
-            first_name = name_parts[0]
-            last_name = name_parts[1] if len(name_parts) > 1 else ""
-            domain = _extract_domain(company.website)
+            if domain and not company.website:
+                company.website = f"https://{domain}"
 
-            result = EnrichmentService().find_and_verify_email(
-                first_name=first_name,
-                last_name=last_name,
-                domain=domain,
-            )
-
-            if result is not None:
-                draft.stakeholder_email = result["email"]
-                draft.email_verified = result["is_valid"]
-                draft.email_mx_domain = result["mx_domain"]
+            if email:
+                draft.stakeholder_email = email
+                draft.email_verified = is_verified
+                draft.email_mx_domain = domain
                 db.commit()
                 db.refresh(draft)
+            elif company.website:
+                db.commit()
 
-        except EnrichmentAPIError as e:
-            logger.warning(
-                f"Auto email enrichment failed for draft {draft.id}: {e.message}"
-            )
         except Exception as e:
             logger.warning(
                 f"Auto email enrichment error for draft {draft.id}: {e}"

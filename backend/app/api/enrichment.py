@@ -181,48 +181,64 @@ def find_email_for_draft(
             "cached": True,
         }
 
-    if not draft.stakeholder_name.strip():
-        raise HTTPException(
-            status_code=400,
-            detail="Draft has no stakeholder name to look up",
-        )
-
     company = (
         db.query(Company)
         .filter(Company.id == draft.company_id)
         .first()
     )
 
-    if not company or not company.website:
-        raise HTTPException(
-            status_code=400,
-            detail="Company has no website/domain on file",
-        )
-
-    name_parts = draft.stakeholder_name.strip().split(" ", 1)
-    first_name = name_parts[0]
-    last_name = name_parts[1] if len(name_parts) > 1 else ""
-
-    domain = _extract_domain(company.website)
-
-    try:
-        result = enrichment.find_and_verify_email(
-            first_name=first_name,
-            last_name=last_name,
-            domain=domain,
-        )
-    except EnrichmentAPIError as e:
-        raise HTTPException(status_code=e.status_code, detail=e.message)
-
-    if result is None:
+    if not company:
         raise HTTPException(
             status_code=404,
-            detail="No email found for this stakeholder/domain",
+            detail="Company not found",
         )
 
-    draft.stakeholder_email = result["email"]
-    draft.email_verified = result["is_valid"]
-    draft.email_mx_domain = result["mx_domain"]
+    import json
+    from app.models.analysis_result import AnalysisResult
+    from app.models.knowledge_source import KnowledgeSource
+    from app.utils.email_discovery import discover_company_email
+
+    knowledge_text = ""
+    sources = []
+    if draft.analysis_id:
+        analysis = (
+            db.query(AnalysisResult)
+            .filter(AnalysisResult.id == draft.analysis_id)
+            .first()
+        )
+        if analysis and analysis.knowledge_id:
+            ks = (
+                db.query(KnowledgeSource)
+                .filter(KnowledgeSource.id == analysis.knowledge_id)
+                .first()
+            )
+            if ks:
+                knowledge_dict = (ks.processed_data or {}).get("knowledge", {}) if isinstance(ks.processed_data, dict) else {}
+                sources = knowledge_dict.get("sources") or []
+                knowledge_text = f"{ks.raw_content or ''}\n{json.dumps(ks.processed_data or {})}"
+                if not company.website and knowledge_dict.get("website"):
+                    company.website = knowledge_dict.get("website")
+
+    email, domain, is_verified = discover_company_email(
+        company_name=company.name or "",
+        website=company.website,
+        stakeholder_name=draft.stakeholder_name or "",
+        knowledge_text=knowledge_text,
+        sources=sources,
+    )
+
+    if not email:
+        raise HTTPException(
+            status_code=404,
+            detail="No email found for this stakeholder or firm",
+        )
+
+    if domain and not company.website:
+        company.website = f"https://{domain}"
+
+    draft.stakeholder_email = email
+    draft.email_verified = is_verified
+    draft.email_mx_domain = domain
 
     db.commit()
     db.refresh(draft)
