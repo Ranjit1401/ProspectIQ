@@ -99,6 +99,7 @@ class AuthService:
                 credentials.token,
                 req,
                 audience=audience,
+                clock_skew_in_seconds=60,
             )
         except Exception as e:
             raise ValueError(f"Google authentication failed: {str(e)}")

@@ -1,11 +1,13 @@
 import base64
 import hashlib
 import hmac
+import os
 import secrets
 from datetime import datetime, timedelta, timezone
 
-from urllib.parse import quote_plus
+from urllib.parse import quote_plus, urlparse
 
+import requests as http_requests
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
 from google.auth.transport import requests
@@ -15,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user
 from app.core.config import settings
+from app.core.logger import logger
 from app.database.session import get_db
 from app.models.connected_account import ConnectedAccount
 from app.models.oauth_state import OAuthState
@@ -28,6 +31,11 @@ from app.schemas.user import (
 )
 from app.services.auth_service import AuthService
 
+# Allow Google OAuth to return normalized or previously-granted scopes
+# (e.g. "userinfo.profile" when include_granted_scopes=true) without
+# oauthlib raising a fatal "Scope has changed" Warning exception.
+os.environ.setdefault("OAUTHLIB_RELAX_TOKEN_SCOPE", "1")
+
 
 router = APIRouter(
     prefix="/auth",
@@ -35,6 +43,39 @@ router = APIRouter(
 )
 
 service = AuthService()
+
+# Maps OAuth state -> validated initiating frontend origin so callbacks
+# always return to the exact origin (localhost vs 127.0.0.1 vs Vercel)
+# where the user's JWT token resides in localStorage.
+_oauth_redirect_origins: dict[str, str] = {}
+
+
+def _resolve_safe_frontend_origin(request: Request) -> str:
+    candidate = request.headers.get("origin") or request.headers.get("referer")
+    if not candidate:
+        return settings.FRONTEND_URL.rstrip("/")
+
+    parsed = urlparse(candidate)
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        return settings.FRONTEND_URL.rstrip("/")
+
+    origin = f"{parsed.scheme}://{parsed.netloc}".rstrip("/")
+    allowed = {
+        settings.FRONTEND_URL.rstrip("/"),
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "https://prospect-iq-drab.vercel.app",
+        "https://prospect-iq-oobr.vercel.app",
+        "https://prospect-4zw62ppxf-ranjit-bhardwaj-s-projects.vercel.app",
+    }
+    if settings.CORS_ORIGINS:
+        for extra in settings.CORS_ORIGINS.split(","):
+            if extra.strip():
+                allowed.add(extra.strip().rstrip("/"))
+
+    return origin if origin in allowed else settings.FRONTEND_URL.rstrip("/")
 
 
 # ============================================================
@@ -171,6 +212,7 @@ def create_google_flow(
 
 @router.get("/google/connect")
 def google_connect(
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -191,6 +233,9 @@ def google_connect(
         # ----------------------------------------------------
 
         state = generate_oauth_state()
+
+        # Remember initiating frontend origin so callback returns to the exact same origin
+        _oauth_redirect_origins[state] = _resolve_safe_frontend_origin(request)
 
         # ----------------------------------------------------
         # 3. Calculate expiration
@@ -256,8 +301,9 @@ def google_connect(
 
 @router.get("/google/callback")
 def google_callback(
-    code: str,
     state: str,
+    code: str | None = None,
+    error: str | None = None,
     db: Session = Depends(get_db),
 ):
     """
@@ -278,7 +324,20 @@ def google_callback(
     create/update ConnectedAccount
     """
 
+    frontend_url = _oauth_redirect_origins.pop(state, settings.FRONTEND_URL.rstrip("/"))
+
     try:
+        if error:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Google authorization cancelled or denied ({error}).",
+            )
+
+        if not code:
+            raise HTTPException(
+                status_code=400,
+                detail="Missing authorization code from Google.",
+            )
 
         # ====================================================
         # 1. Retrieve OAuth state
@@ -378,6 +437,7 @@ def google_callback(
         # 6. Create OAuth flow
         # ====================================================
 
+        os.environ["OAUTHLIB_RELAX_TOKEN_SCOPE"] = "1"
         flow = create_google_flow(
             code_verifier=code_verifier
         )
@@ -393,47 +453,52 @@ def google_callback(
         credentials = flow.credentials
 
         # ====================================================
-        # 8. Make sure ID token exists
+        # 8. Verify Google ID token (with userinfo fallback)
         # ====================================================
 
-        if not credentials.id_token:
-            raise HTTPException(
-                status_code=400,
-                detail="Google did not return an ID token",
+        google_email: str | None = None
+        email_verified: bool = False
+        google_subject: str | None = None
+
+        if credentials.id_token:
+            request = requests.Request()
+
+            id_info = id_token.verify_oauth2_token(
+                credentials.id_token,
+                request,
+                settings.GOOGLE_CLIENT_ID,
+                clock_skew_in_seconds=60,
             )
 
-        # ====================================================
-        # 9. Verify Google ID token
-        # ====================================================
+            issuer = id_info.get("iss")
+            if issuer not in [
+                "accounts.google.com",
+                "https://accounts.google.com",
+            ]:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Invalid Google token issuer",
+                )
 
-        request = requests.Request()
-
-        id_info = id_token.verify_oauth2_token(
-            credentials.id_token,
-            request,
-            settings.GOOGLE_CLIENT_ID,
-        )
-
-        # ====================================================
-        # 10. Validate issuer
-        # ====================================================
-
-        issuer = id_info.get("iss")
-
-        if issuer not in [
-            "accounts.google.com",
-            "https://accounts.google.com",
-        ]:
-            raise HTTPException(
-                status_code=400,
-                detail="Invalid Google token issuer",
+            google_email = id_info.get("email")
+            email_verified = id_info.get("email_verified") is True
+            google_subject = id_info.get("sub")
+        else:
+            # Fallback to Google userinfo endpoint when id_token is omitted
+            userinfo_resp = http_requests.get(
+                "https://www.googleapis.com/oauth2/v3/userinfo",
+                headers={"Authorization": f"Bearer {credentials.token}"},
+                timeout=10,
             )
-
-        # ====================================================
-        # 11. Validate email
-        # ====================================================
-
-        google_email = id_info.get("email")
+            if not userinfo_resp.ok:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Google did not return an ID token or user profile.",
+                )
+            userinfo = userinfo_resp.json()
+            google_email = userinfo.get("email")
+            email_verified = userinfo.get("email_verified") is True
+            google_subject = userinfo.get("sub")
 
         if not google_email:
             raise HTTPException(
@@ -441,25 +506,11 @@ def google_callback(
                 detail="Google account email not found",
             )
 
-        # ====================================================
-        # 12. Validate email verification
-        # ====================================================
-
-        email_verified = id_info.get(
-            "email_verified"
-        )
-
-        if email_verified is not True:
+        if not email_verified:
             raise HTTPException(
                 status_code=400,
                 detail="Google email is not verified",
             )
-
-        # ====================================================
-        # 13. Get Google account ID
-        # ====================================================
-
-        google_subject = id_info.get("sub")
 
         if not google_subject:
             raise HTTPException(
@@ -468,7 +519,7 @@ def google_callback(
             )
 
         # ====================================================
-        # 14. Find existing Google connection
+        # 9. Find existing Google connection
         # ====================================================
 
         account = (
@@ -483,35 +534,25 @@ def google_callback(
         )
 
         # ====================================================
-        # 15. Update existing account
+        # 10. Update existing account or create new account
         # ====================================================
 
         if account:
 
             account.email = google_email
-
             account.access_token = credentials.token
 
             # Google may NOT return a refresh token
             # during subsequent authorizations.
             if credentials.refresh_token:
-                account.refresh_token = (
-                    credentials.refresh_token
-                )
+                account.refresh_token = credentials.refresh_token
 
             account.token_expiry = credentials.expiry
 
-            # Store Google subject if your model supports it.
             if hasattr(account, "provider_account_id"):
                 account.provider_account_id = google_subject
 
-            account.updated_at = datetime.now(
-                timezone.utc
-            )
-
-        # ====================================================
-        # 16. Create new account
-        # ====================================================
+            account.updated_at = datetime.utcnow()
 
         else:
 
@@ -520,8 +561,8 @@ def google_callback(
                     status_code=400,
                     detail=(
                         "Google did not return a refresh token. "
-                        "Please revoke the existing Google "
-                        "permission and connect again."
+                        "Please revoke ProspectIQ access in your Google Account "
+                        "permissions (myaccount.google.com/permissions) and connect again."
                     ),
                 )
 
@@ -540,25 +581,25 @@ def google_callback(
             db.add(account)
 
         # ====================================================
-        # 17. Save account
+        # 11. Save account
         # ====================================================
 
         db.commit()
         db.refresh(account)
 
-       # ====================================================
-        # 18. Success — redirect back into the frontend app
+        # ====================================================
+        # 12. Success — redirect back into the frontend app
         # ====================================================
 
         return RedirectResponse(
-            url=f"{settings.FRONTEND_URL}/queue?gmail_connected=true"
+            url=f"{frontend_url}/queue?gmail_connected=true"
         )
 
     except HTTPException as e:
         safe_detail = quote_plus(str(e.detail))
         return RedirectResponse(
             url=(
-                f"{settings.FRONTEND_URL}/queue"
+                f"{frontend_url}/queue"
                 f"?gmail_error={safe_detail}"
             )
         )
@@ -566,19 +607,13 @@ def google_callback(
     except Exception as e:
 
         db.rollback()
-
-        print(
-            "\n========== GOOGLE OAUTH ERROR =========="
-        )
-        print(str(e))
-        print(
-            "========================================\n"
-        )
+        logger.error(f"Google OAuth callback error: {e}", exc_info=True)
+        safe_err = quote_plus(str(e) or "connection_failed")
 
         return RedirectResponse(
             url=(
-                f"{settings.FRONTEND_URL}/queue"
-                f"?gmail_error=connection_failed"
+                f"{frontend_url}/queue"
+                f"?gmail_error={safe_err}"
             )
         )
 

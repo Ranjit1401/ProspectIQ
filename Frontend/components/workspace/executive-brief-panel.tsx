@@ -127,7 +127,7 @@ export function HistorySidebar({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [activeCompanyId]);
 
   return (
     <Card className="flex h-full min-h-0 flex-col">

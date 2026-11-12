@@ -2,6 +2,8 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { authService, type CurrentUser } from "@/services/auth.service";
 import { getToken, clearToken } from "@/services/api-client";
+import { setCacheOwner, clearCache } from "@/lib/data-cache";
+import { setWorkspaceUser, resetWorkspaceStore } from "@/lib/workspace-store";
 
 interface AuthContextValue {
   user: CurrentUser | null;
@@ -24,6 +26,8 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
 
     async function verify() {
       if (!getToken()) {
+        clearCache();
+        resetWorkspaceStore();
         navigate("/login", { replace: true });
         return;
       }
@@ -31,12 +35,16 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
       try {
         const me = await authService.me();
         if (!cancelled) {
+          setCacheOwner(me.id);
+          setWorkspaceUser(me.id);
           setUser(me);
           setChecked(true);
         }
       } catch {
         // Token missing/expired/invalid — clear it and send back to login.
         clearToken();
+        clearCache();
+        resetWorkspaceStore();
         if (!cancelled) navigate("/login", { replace: true });
       }
     }

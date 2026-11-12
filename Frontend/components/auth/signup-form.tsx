@@ -47,6 +47,8 @@ export function SignupForm() {
         <Input
           id="username"
           placeholder="Alex Kim"
+          minLength={3}
+          maxLength={50}
           value={username}
           onChange={(e) => setUsername(e.target.value)}
           required
@@ -68,7 +70,9 @@ export function SignupForm() {
         <Input
           id="password"
           type="password"
-          placeholder="••••••••••"
+          placeholder="At least 8 characters"
+          minLength={8}
+          maxLength={128}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required

@@ -19,6 +19,7 @@
 
 import { workspaceService, type AnalyzeResponse, type StreamFrame, type SupervisorResponse } from "@/services/workspace.service";
 import { ApiError } from "@/services/api-client";
+import { invalidateCache } from "@/lib/data-cache";
 import type { ComposerAttachment, WorkspaceMode } from "@/components/workspace/prompt-composer";
 import type { ChatMessage, WorkspaceStreamStep } from "@/types";
 
@@ -68,39 +69,85 @@ let state: WorkspaceState = {
  */
 const threads = new Map<string, WorkspaceState>();
 let activeThreadKey: string = DEFAULT_THREAD_KEY;
+let currentUserId: string | number | null = null;
+
+function storageKey(userId: string | number | null): string | null {
+  if (userId === null || userId === undefined) return null;
+  return `prospectiq_chat_threads_${userId}`;
+}
 
 function saveThreadsToStorage() {
   if (typeof window === "undefined") return;
+  const key = storageKey(currentUserId);
+  if (!key) return;
   try {
     const data: Record<string, WorkspaceState> = {};
-    threads.forEach((val, key) => {
-      data[key] = {
+    threads.forEach((val, threadKey) => {
+      data[threadKey] = {
         messages: val.messages,
         sending: false,
         result: val.result,
         activeCompanyId: val.activeCompanyId,
       };
     });
-    localStorage.setItem("prospectiq_chat_threads", JSON.stringify(data));
+    localStorage.setItem(key, JSON.stringify(data));
   } catch {}
 }
 
-function loadThreadsFromStorage() {
+function loadThreadsFromStorage(userId: string | number) {
   if (typeof window === "undefined") return;
+  const key = storageKey(userId);
+  if (!key) return;
   try {
-    const raw = localStorage.getItem("prospectiq_chat_threads");
+    // Remove legacy global un-scoped thread cache so it never leaks across users
+    localStorage.removeItem("prospectiq_chat_threads");
+    const raw = localStorage.getItem(key);
     if (raw) {
       const parsed: Record<string, WorkspaceState> = JSON.parse(raw);
-      Object.entries(parsed).forEach(([key, val]) => {
-        threads.set(key, val);
+      Object.entries(parsed).forEach(([threadKey, val]) => {
+        threads.set(threadKey, val);
       });
     }
   } catch {}
 }
 
-// Initial load from storage on browser mount
-if (typeof window !== "undefined") {
-  loadThreadsFromStorage();
+/** Switches workspace thread store to the authenticated user's isolated storage. */
+export function setWorkspaceUser(userId: string | number) {
+  if (currentUserId === userId) return;
+  abortController?.abort();
+  abortController = null;
+  threads.clear();
+  currentUserId = userId;
+  activeThreadKey = DEFAULT_THREAD_KEY;
+  state = {
+    messages: [WELCOME],
+    sending: false,
+    result: null,
+    activeCompanyId: null,
+  };
+  loadThreadsFromStorage(userId);
+  emit();
+}
+
+/** Clears active workspace state and in-memory threads on logout or account switch. */
+export function resetWorkspaceStore() {
+  abortController?.abort();
+  abortController = null;
+  threads.clear();
+  currentUserId = null;
+  activeThreadKey = DEFAULT_THREAD_KEY;
+  state = {
+    messages: [WELCOME],
+    sending: false,
+    result: null,
+    activeCompanyId: null,
+  };
+  if (typeof window !== "undefined") {
+    try {
+      localStorage.removeItem("prospectiq_chat_threads");
+    } catch {}
+  }
+  emit();
 }
 
 const listeners = new Set<() => void>();
@@ -254,6 +301,11 @@ function applyFinalResult(response: SupervisorResponse, assistantId: string) {
     // (within this browser session) will show these actual messages.
     threads.delete(activeThreadKey);
     activeThreadKey = companyId;
+
+    invalidateCache("workspace:recent-sessions");
+    invalidateCache("workspace:companies");
+    invalidateCache("workspace:stats");
+    invalidateCache("recommendations:companies");
 
     setState({ result: analysis, activeCompanyId: companyId });
     const assessment = analysis.overall_assessment;

@@ -1,4 +1,6 @@
 import { apiFetch, setToken, clearToken } from "./api-client";
+import { clearCache } from "@/lib/data-cache";
+import { resetWorkspaceStore } from "@/lib/workspace-store";
 
 export interface LoginPayload {
   email: string;
@@ -25,6 +27,8 @@ export interface CurrentUser {
 
 export const authService = {
   async login(payload: LoginPayload): Promise<AuthResponse> {
+    clearCache();
+    resetWorkspaceStore();
     const result = await apiFetch<AuthResponse>("/auth/login", {
       method: "POST",
       body: JSON.stringify(payload),
@@ -35,6 +39,8 @@ export const authService = {
   },
 
   async register(payload: RegisterPayload) {
+    clearCache();
+    resetWorkspaceStore();
     return apiFetch("/auth/register", {
       method: "POST",
       body: JSON.stringify(payload),
@@ -48,9 +54,13 @@ export const authService = {
 
   logout() {
     clearToken();
+    clearCache();
+    resetWorkspaceStore();
   },
 
   async googleLogin(token: string) {
+    clearCache();
+    resetWorkspaceStore();
     const result = await apiFetch<AuthResponse>("/auth/google-auth", {
       method: "POST",
       body: JSON.stringify({

@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
+import { CheckCircle2, AlertCircle, Loader2, X } from "lucide-react";
 import { OutreachReviewPanel } from "@/components/queue/outreach-review-panel";
 import { queueService } from "@/services/queue.service";
 import { ApiError } from "@/services/api-client";
@@ -20,6 +21,13 @@ const STATUS_DOT: Record<OutreachDraft["status"], string> = {
 const QUEUE_CACHE_KEY = "queue:drafts";
 
 export default function QueuePage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [gmailNotice, setGmailNotice] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
+  const [gmailRefreshKey, setGmailRefreshKey] = useState(0);
+
   const [drafts, setDrafts] = useState<OutreachDraft[]>(
     () => getCached<OutreachDraft[]>(QUEUE_CACHE_KEY) ?? [],
   );
@@ -30,6 +38,30 @@ export default function QueuePage() {
     () => getCached<OutreachDraft[]>(QUEUE_CACHE_KEY) === undefined,
   );
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const connected = searchParams.get("gmail_connected");
+    const gmailError = searchParams.get("gmail_error");
+    if (!connected && !gmailError) return;
+
+    if (connected === "true") {
+      setGmailNotice({
+        type: "success",
+        text: "Gmail account connected successfully. You can now send approved outreach emails.",
+      });
+      setGmailRefreshKey((k) => k + 1);
+    } else if (gmailError) {
+      setGmailNotice({
+        type: "error",
+        text: `Gmail connection failed: ${gmailError}`,
+      });
+    }
+
+    const next = new URLSearchParams(searchParams);
+    next.delete("gmail_connected");
+    next.delete("gmail_error");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   useEffect(() => {
     let cancelled = false;
@@ -129,6 +161,33 @@ export default function QueuePage() {
         </p>
       </div>
 
+      {gmailNotice && (
+        <div
+          className={cn(
+            "flex items-center justify-between gap-3 rounded-xl border px-4 py-3 text-sm backdrop-blur-md",
+            gmailNotice.type === "success"
+              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+              : "border-red-500/30 bg-red-500/10 text-red-300",
+          )}
+        >
+          <div className="flex items-center gap-2.5">
+            {gmailNotice.type === "success" ? (
+              <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />
+            ) : (
+              <AlertCircle className="h-4 w-4 shrink-0 text-red-400" />
+            )}
+            <span>{gmailNotice.text}</span>
+          </div>
+          <button
+            onClick={() => setGmailNotice(null)}
+            className="rounded-lg p-1 text-white/40 hover:bg-white/10 hover:text-white transition-colors"
+            aria-label="Dismiss message"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
+
       {loading && (
         <div className="flex items-center gap-2 py-10 text-sm text-white/40">
           <Loader2 className="h-4 w-4 animate-spin" />
@@ -175,6 +234,7 @@ export default function QueuePage() {
             draft={selectedDraft}
             index={selectedIndex}
             total={drafts.length}
+            gmailRefreshKey={gmailRefreshKey}
             onPrev={goPrev}
             onNext={goNext}
             onApprove={handleApprove}

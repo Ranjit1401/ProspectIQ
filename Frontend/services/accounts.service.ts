@@ -1,16 +1,5 @@
 import type { BuyingSignal, Company, PainPoint, Stakeholder, ResearchStatus } from "@/types";
-import { getCompanyById } from "@/lib/mock-data";
 import { workspaceService, type WorkspaceCompanySummary } from "./workspace.service";
-
-export const DEFAULT_RECENT_SESSIONS: Company[] = [
-  { id: "solstice", name: "Solstice Sunglasses", industry: "Retail & E-commerce", employees: "1,000+", revenue: "$150M", score: 30, status: "analyzed", country: "USA", logoInitial: "S" },
-  { id: "adobe", name: "Adobe Inc.", industry: "Enterprise Software", employees: "29,000+", revenue: "$19.4B", score: 40, status: "analyzed", country: "USA", logoInitial: "A" },
-  { id: "beardo", name: "Beardo", industry: "Consumer Goods", employees: "500+", revenue: "$50M", score: 10, status: "analyzed", country: "India", logoInitial: "B" },
-  { id: "nimbus", name: "Nimbus Logistics", industry: "Supply Chain & Logistics", employees: "2,500+", revenue: "$320M", score: 60, status: "analyzed", country: "USA", logoInitial: "N" },
-  { id: "tata", name: "Tata Group", industry: "Conglomerate", employees: "1,000,000+", revenue: "$150B", score: 20, status: "analyzed", country: "India", logoInitial: "T" },
-  { id: "google", name: "Google", industry: "Technology", employees: "180,000+", revenue: "$307B", score: 80, status: "analyzed", country: "USA", logoInitial: "G" },
-  { id: "microsoft", name: "Microsoft Corporation", industry: "Technology", employees: "220,000+", revenue: "$211B", score: 20, status: "analyzed", country: "USA", logoInitial: "M" },
-];
 
 function toCompany(summary: WorkspaceCompanySummary): Company {
   return {
@@ -28,18 +17,13 @@ function toCompany(summary: WorkspaceCompanySummary): Company {
 
 export const accountsService = {
   async list(): Promise<Company[]> {
-    try {
-      const summaries = await workspaceService.listCompanies();
-      if (summaries && summaries.length > 0) {
-        return summaries.map(toCompany);
-      }
-    } catch {}
-    return DEFAULT_RECENT_SESSIONS;
+    const summaries = await workspaceService.listCompanies();
+    return (summaries ?? []).map(toCompany);
   },
 
   async getById(id: string): Promise<Company | undefined> {
     const all = await accountsService.list();
-    return all.find((c) => c.id === id) ?? getCompanyById(id);
+    return all.find((c) => c.id === id);
   },
 
   async getStakeholders(companyId: string): Promise<Stakeholder[]> {

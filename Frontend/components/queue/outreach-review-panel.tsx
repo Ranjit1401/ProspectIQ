@@ -30,6 +30,7 @@ export function OutreachReviewPanel({
   draft,
   index,
   total,
+  gmailRefreshKey = 0,
   onPrev,
   onNext,
   onApprove,
@@ -41,6 +42,7 @@ export function OutreachReviewPanel({
   draft: OutreachDraft;
   index: number;
   total: number;
+  gmailRefreshKey?: number;
   onPrev: () => void;
   onNext: () => void;
   onApprove: (id: string) => Promise<void>;
@@ -58,22 +60,29 @@ export function OutreachReviewPanel({
   const [recipient, setRecipient] = useState("");
   const [senderConnected, setSenderConnected] = useState(false);
   const [connectedEmail, setConnectedEmail] = useState("");
+  const [connectingGmail, setConnectingGmail] = useState(false);
+  const [gmailConnectError, setGmailConnectError] = useState<string | null>(null);
 
-  // Check Gmail connection status on initial mount
+  // Check Gmail connection status on mount and when OAuth callback completes
   useEffect(() => {
+    let cancelled = false;
     async function loadGmailStatus() {
       try {
-        const data: any = await apiFetch("/auth/google/status");
-
-        setSenderConnected(data.connected);
-        setConnectedEmail(data.email || "");
+        const data = await apiFetch<{ connected: boolean; email: string | null }>("/auth/google/status");
+        if (!cancelled) {
+          setSenderConnected(Boolean(data.connected));
+          setConnectedEmail(data.email || "");
+        }
       } catch (err) {
         console.error(err);
       }
     }
 
     loadGmailStatus();
-  }, []);
+    return () => {
+      cancelled = true;
+    };
+  }, [gmailRefreshKey]);
 
   // Sync draft fields and pre-fill recipient when active draft changes
   useEffect(() => {
@@ -85,12 +94,17 @@ export function OutreachReviewPanel({
   const ChannelIcon = CHANNEL_ICON[draft.channel];
 
   async function handleConnectGmail() {
+    setConnectingGmail(true);
+    setGmailConnectError(null);
     try {
-      const data: any = await apiFetch("/auth/google/connect");
-
+      const data = await apiFetch<{ authorization_url: string }>("/auth/google/connect");
       window.location.href = data.authorization_url;
     } catch (err) {
       console.error(err);
+      setGmailConnectError(
+        err instanceof Error ? err.message : "Failed to start Gmail connection.",
+      );
+      setConnectingGmail(false);
     }
   }
 
@@ -258,12 +272,19 @@ export function OutreachReviewPanel({
                         </button>
                       </div>
                     ) : (
-                      <button
-                        onClick={handleConnectGmail}
-                        className="mt-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-500"
-                      >
-                        Connect Gmail
-                      </button>
+                      <div className="mt-2 space-y-2">
+                        <button
+                          onClick={handleConnectGmail}
+                          disabled={connectingGmail}
+                          className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-500 disabled:opacity-50"
+                        >
+                          {connectingGmail && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                          {connectingGmail ? "Connecting..." : "Connect Gmail"}
+                        </button>
+                        {gmailConnectError && (
+                          <p className="text-xs text-red-400">{gmailConnectError}</p>
+                        )}
+                      </div>
                     )}
                   </div>
 

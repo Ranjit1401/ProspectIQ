@@ -21,9 +21,26 @@ type CacheEntry<T> = {
   
   const cache = new Map<string, CacheEntry<unknown>>();
   const inflight = new Map<string, Promise<unknown>>();
+  let cacheOwnerId: string | number | null = null;
   
   /** How long cached data is considered fresh enough to skip revalidation entirely. */
   const DEFAULT_TTL_MS = 60_000;
+
+  /** Wipes all cached entries (e.g. on logout or user switch) so data never bleeds across accounts. */
+  export function clearCache(): void {
+    cache.clear();
+    inflight.clear();
+    cacheOwnerId = null;
+  }
+
+  /** Ensures the in-memory cache belongs to the currently authenticated user. */
+  export function setCacheOwner(userId: string | number): void {
+    if (cacheOwnerId !== null && cacheOwnerId !== userId) {
+      cache.clear();
+      inflight.clear();
+    }
+    cacheOwnerId = userId;
+  }
   
   export function getCached<T>(key: string): T | undefined {
     return cache.get(key)?.data as T | undefined;

@@ -71,7 +71,19 @@ export async function apiFetch<T>(
 
   if (!response.ok) {
     const body = await response.text().catch(() => "");
-    throw new ApiError(body || response.statusText, response.status);
+    let message = body || response.statusText;
+    try {
+      const parsed = JSON.parse(body);
+      if (typeof parsed?.detail === "string") {
+        message = parsed.detail;
+      } else if (Array.isArray(parsed?.detail) && parsed.detail.length > 0) {
+        message = parsed.detail
+          .map((item: { msg?: string }) => item.msg || "")
+          .filter(Boolean)
+          .join(", ") || message;
+      }
+    } catch {}
+    throw new ApiError(message, response.status);
   }
 
   if (response.status === 204) return undefined as T;

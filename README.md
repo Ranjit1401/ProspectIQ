@@ -203,7 +203,6 @@ npm run test:backend     # Run backend security unit test suite
 
 **Known limitations**
 - Outreach sends through Gmail only. LinkedIn and call-script drafts are generated but not sent.
-- `accounts.service.ts` contains a demo-only fallback that shows sample data when the backend is unreachable.
 - Meeting scheduling exists in the frontend but its backend endpoints are not finished.
 - Security unit tests exist (`backend/tests/test_security.py`), though full end-to-end integration tests and Guardrail agent formal benchmarking are still pending.
 
